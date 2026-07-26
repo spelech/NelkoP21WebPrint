@@ -4,9 +4,23 @@ An open-source, containerized application suite for the **Nelko P21** thermal la
 
 ---
 
+## 🎨 Web Designer Interface Screenshots
+
+### 1. Visual Designer Studio UI
+![Web Designer Studio](./docs/images/web_designer_studio.jpg)
+
+### 2. 1-Bit Thermal Printhead Preview Modal
+![Thermal Preview Modal](./docs/images/thermal_preview_modal.jpg)
+
+### 3. Driver & Connection Settings Modal
+![Connection Settings Modal](./docs/images/connection_settings_modal.jpg)
+
+---
+
 ## ✨ Features
 
 * **🎨 React Visual Label Designer**: Design labels in browser with presets ($14 \times 40\text{mm}$, $12 \times 30\text{mm}$, $12 \times 40\text{mm}$, etc.), text, barcodes, QR codes, and 1-bit thermal print previews.
+* **📱 Browser-Direct Bluetooth (Web Serial / Web Bluetooth)**: Connect directly from your phone, tablet, or laptop browser to the printer anywhere in your home.
 * **🚀 FastAPI REST API**: Programmatically format and print labels from external scripts, webhooks, or automation workflows.
 * **🤖 FastMCP AI Tools**: Native Model Context Protocol server enabling AI assistants (Claude, Antigravity, LLMs) to print labels via simple natural language tool calls.
 * **🔌 Flexible Connection Drivers**:
@@ -102,7 +116,10 @@ NelkoP21WebPrint/
 │   ├── 02_TSPL_PROTOCOL_SPEC.md
 │   ├── 03_RASTERIZATION_AND_IMAGE_PROCESSING.md
 │   ├── 04_DEVICE_MATRIX_AND_CONFIG.md
-│   └── 05_PAPER_PRESETS_AND_RFID.md
+│   ├── 05_PAPER_PRESETS_AND_RFID.md
+│   ├── 06_ESP32_MULTI_NODE_BRIDGE.md
+│   ├── 07_SYSTEM_ARCHITECTURE.md
+│   └── images/                 # Real Web UI Screenshots
 ├── backend/                    # Python FastAPI & FastMCP Server
 │   ├── app/
 │   │   ├── api/                # REST endpoints
@@ -113,6 +130,7 @@ NelkoP21WebPrint/
 ├── frontend/                   # React Visual Label Studio
 │   ├── src/
 │   │   ├── App.jsx             # Label Editor UI
+│   │   ├── utils/              # Client-side Web Bluetooth & TSPL generator
 │   │   └── main.jsx
 │   └── vite.config.js
 ├── Dockerfile                  # Multi-stage Docker build

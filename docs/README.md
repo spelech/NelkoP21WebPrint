@@ -47,6 +47,9 @@ The **Nelko P21** is a portable 203 DPI monochrome thermal label printer. While 
 6. [06_ESP32_MULTI_NODE_BRIDGE.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/06_ESP32_MULTI_NODE_BRIDGE.md)  
    *Multi-floor ESP32 dev board setup, Bluetooth Classic hardware requirements, auto-discovery failover, and power considerations.*
 
+7. [07_SYSTEM_ARCHITECTURE.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/07_SYSTEM_ARCHITECTURE.md)  
+   *High-level system architecture, client/server component hierarchy, Web Bluetooth & REST API data flow, and UI screenshots.*
+
 ---
 
 ## ⚙ Quick Start Code Flow
