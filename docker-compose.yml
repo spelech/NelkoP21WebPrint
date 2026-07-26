@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  nelko-p21-print:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nelko-p21-print
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PRINTER_DRIVER=tcp
+      - PRINTER_TCP_HOST=192.168.1.50  # IP of ESP32 bridge or TCP server
+      - PRINTER_TCP_PORT=9100
+      - PRINTER_BT_MAC=00:11:22:33:44:55
+    # For Direct Bluetooth SPP access on Linux hosts, uncomment below:
+    # network_mode: "host"
+    # privileged: true
+    # volumes:
+    #   - /var/run/dbus:/var/run/dbus
+    #   - /dev/rfcomm0:/dev/rfcomm0
