@@ -15,34 +15,37 @@ import {
   FileText,
   Smartphone,
   Wifi,
-  Bluetooth
+  Bluetooth,
+  RotateCw
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
-import { convertCanvasToTsplBytes, mmToDots } from './utils/tsplGenerator';
+import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
 
+// Presets oriented in Landscape view (Width x Height) for optimal readable workspace
 const PRESETS = [
-  { name: '14 x 40 mm (Standard Gap)', width: 14, height: 40, gap: 5 },
-  { name: '12 x 40 mm White Gap', width: 12, height: 40, gap: 5 },
-  { name: '12 x 30 mm Compact', width: 12, height: 30, gap: 5 },
-  { name: '12 x 22 mm Mini', width: 12, height: 22, gap: 5 },
-  { name: '15 x 50 mm Cable Flag', width: 15, height: 50, gap: 5 },
-  { name: '12 mm Continuous Roll', width: 12, height: 60, gap: 0 },
+  { name: '40 x 14 mm (Standard Gap)', width: 40, height: 14, gap: 5 },
+  { name: '40 x 12 mm White Gap', width: 40, height: 12, gap: 5 },
+  { name: '30 x 12 mm Compact', width: 30, height: 12, gap: 5 },
+  { name: '22 x 12 mm Mini', width: 22, height: 12, gap: 5 },
+  { name: '50 x 15 mm Cable Flag', width: 50, height: 15, gap: 5 },
+  { name: '60 x 12 mm Continuous Roll', width: 60, height: 12, gap: 0 },
 ];
 
 export default function App() {
   // Preset & Label Dimensions
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
+  const [isPortraitView, setIsPortraitView] = useState(false); // Default to Landscape view
 
   // Label Elements
   const [elements, setElements] = useState([
-    { id: 1, type: 'text', content: 'NELKO P21', fontSize: 24, fontStyle: 'bold', x: 20, y: 30, width: 180, height: 30, align: 'center' },
-    { id: 2, type: 'text', content: 'SAMPLE LABEL', fontSize: 14, fontStyle: 'normal', x: 20, y: 70, width: 180, height: 20, align: 'center' },
-    { id: 3, type: 'qr', content: 'https://nelko.app', x: 70, y: 110, size: 80 }
+    { id: 1, type: 'text', content: 'NELKO P21', fontSize: 22, fontStyle: 'bold', x: 25, y: 35, width: 180, height: 30, align: 'center' },
+    { id: 2, type: 'text', content: 'ASSET TAG', fontSize: 13, fontStyle: 'normal', x: 25, y: 70, width: 180, height: 20, align: 'center' },
+    { id: 3, type: 'qr', content: 'https://nelko.app', x: 75, y: 50, size: 70 }
   ]);
   const [selectedId, setSelectedId] = useState(1);
 
   // Print & Driver State
-  const [useBrowserBt, setUseBrowserBt] = useState(true); // Default to Browser Direct BT
+  const [useBrowserBt, setUseBrowserBt] = useState(true);
   const [browserBtConnected, setBrowserBtConnected] = useState(false);
   const [browserBtDeviceName, setBrowserBtDeviceName] = useState('');
   
@@ -65,13 +68,16 @@ export default function App() {
     bt_mac: ''
   });
 
-  const canvasRef = useRef(null);
   const selectedElement = elements.find(el => el.id === selectedId);
+
+  // Active Width & Height based on Portrait / Landscape toggle
+  const activeWidthMm = isPortraitView ? selectedPreset.height : selectedPreset.width;
+  const activeHeightMm = isPortraitView ? selectedPreset.width : selectedPreset.height;
 
   // Calculate 203 DPI Canvas px size
   const dpi = 203;
-  const canvasWidthPx = Math.round((selectedPreset.width * dpi) / 25.4);
-  const canvasHeightPx = Math.round((selectedPreset.height * dpi) / 25.4);
+  const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
+  const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
 
   // Fetch status on load
   useEffect(() => {
@@ -105,7 +111,7 @@ export default function App() {
       content: 'New Text',
       fontSize: 16,
       fontStyle: 'normal',
-      x: 20,
+      x: 30,
       y: 50,
       width: 160,
       height: 25,
@@ -120,9 +126,9 @@ export default function App() {
       id: Date.now(),
       type: 'qr',
       content: 'P21-LABEL-123',
-      x: 60,
-      y: 100,
-      size: 70
+      x: 75,
+      y: 50,
+      size: 60
     };
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
@@ -137,7 +143,7 @@ export default function App() {
     setSelectedId(elements.length > 1 ? elements[0].id : null);
   };
 
-  // Generate Preview from API or Local Canvas
+  // Generate Preview from API
   const handleGeneratePreview = async () => {
     setShowPreview(true);
     try {
@@ -148,8 +154,8 @@ export default function App() {
           text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
           subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
           barcode: elements.find(e => e.type === 'qr')?.content || '',
-          width_mm: selectedPreset.width,
-          height_mm: selectedPreset.height,
+          width_mm: activeWidthMm,
+          height_mm: activeHeightMm,
           gap_mm: selectedPreset.gap,
           dither_method: ditherMethod
         })
@@ -183,16 +189,15 @@ export default function App() {
       }
     });
 
-    return convertCanvasToTsplBytes(canvas, selectedPreset.width, selectedPreset.height, selectedPreset.gap, density, copies, ditherMethod);
+    return convertCanvasToTsplBytes(canvas, activeWidthMm, activeHeightMm, selectedPreset.gap, density, copies, ditherMethod);
   };
 
-  // Handle Print Job (Browser Direct vs Server Bridge)
+  // Handle Print Job
   const handlePrint = async () => {
     setIsPrinting(true);
     setPrintStatus(null);
 
     if (useBrowserBt) {
-      // 1. Direct Browser Bluetooth Mode
       try {
         const payloadBytes = renderCanvasToTsplBytes();
         const success = await browserBtDriver.sendBytes(payloadBytes);
@@ -207,7 +212,6 @@ export default function App() {
         setIsPrinting(false);
       }
     } else {
-      // 2. Server Bridge Mode
       try {
         const res = await fetch('/api/print', {
           method: 'POST',
@@ -216,8 +220,8 @@ export default function App() {
             text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
             subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
             barcode: elements.find(e => e.type === 'qr')?.content || '',
-            width_mm: selectedPreset.width,
-            height_mm: selectedPreset.height,
+            width_mm: activeWidthMm,
+            height_mm: activeHeightMm,
             gap_mm: selectedPreset.gap,
             density: density,
             copies: copies,
@@ -268,7 +272,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Status Pill & Action Controls */}
+        {/* Action Controls */}
         <div className="flex items-center gap-3">
           {useBrowserBt ? (
             <button 
@@ -312,7 +316,7 @@ export default function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Toolbar / Presets */}
         <aside className="w-80 border-r border-slate-800 glass-panel p-5 flex flex-col gap-6 overflow-y-auto">
-          {/* Mode Switcher */}
+          {/* Connection Target Switcher */}
           <div>
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
@@ -336,10 +340,20 @@ export default function App() {
 
           {/* Preset Selection */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Grid className="w-3.5 h-3.5 text-indigo-400" />
-              Label Preset
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Grid className="w-3.5 h-3.5 text-indigo-400" />
+                Label Preset
+              </label>
+              <button 
+                onClick={() => setIsPortraitView(!isPortraitView)}
+                className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                title="Toggle Landscape / Portrait Editing View"
+              >
+                <RotateCw className="w-3 h-3" />
+                {isPortraitView ? 'Portrait' : 'Landscape'}
+              </button>
+            </div>
             <select 
               value={selectedPreset.name}
               onChange={(e) => {
@@ -460,7 +474,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Center Canvas Studio */}
+        {/* Center Canvas Studio (Wide Landscape Workspace) */}
         <main className="flex-1 bg-slate-900/50 p-8 flex flex-col items-center justify-center relative overflow-auto">
           {printStatus && (
             <div className={`absolute top-6 px-4 py-2 rounded-xl text-sm font-medium shadow-lg z-20 flex items-center gap-2 ${printStatus.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
@@ -473,13 +487,16 @@ export default function App() {
           <div className="flex flex-col items-center">
             <div className="text-xs text-slate-400 mb-3 flex items-center gap-2">
               <FileText className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Canvas ({selectedPreset.width}mm × {selectedPreset.height}mm @ 203 DPI)</span>
+              <span>
+                Canvas Workspace ({activeWidthMm}mm × {activeHeightMm}mm @ 203 DPI) 
+                <span className="ml-2 text-indigo-400 font-medium">({isPortraitView ? 'Portrait View' : 'Landscape View - Auto 90° Rotated for Printhead'})</span>
+              </span>
             </div>
 
             {/* Label Paper Sheet */}
             <div 
-              style={{ width: `${canvasWidthPx * 1.8}px`, height: `${canvasHeightPx * 1.8}px` }}
-              className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex flex-col items-center justify-center text-slate-900 transition-all"
+              style={{ width: `${canvasWidthPx * 1.5}px`, height: `${canvasHeightPx * 1.5}px` }}
+              className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex items-center justify-between text-slate-900 transition-all overflow-hidden"
             >
               {elements.map(el => (
                 <div 
@@ -489,9 +506,10 @@ export default function App() {
                     position: 'absolute',
                     left: `${el.x}%`,
                     top: `${el.y}%`,
+                    transform: 'translate(-50%, -50%)',
                     cursor: 'pointer'
                   }}
-                  className={`p-1 rounded border-2 transition ${selectedId === el.id ? 'border-indigo-600 bg-indigo-50/50' : 'border-transparent hover:border-slate-300'}`}
+                  className={`p-1 rounded border-2 transition whitespace-nowrap ${selectedId === el.id ? 'border-indigo-600 bg-indigo-50/50' : 'border-transparent hover:border-slate-300'}`}
                 >
                   {el.type === 'text' && (
                     <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
@@ -499,8 +517,8 @@ export default function App() {
                     </span>
                   )}
                   {el.type === 'qr' && (
-                    <div className="w-16 h-16 bg-slate-900 text-white flex items-center justify-center rounded text-[10px] font-mono p-1 text-center">
-                      [QR: {el.content}]
+                    <div className="w-14 h-14 bg-slate-900 text-white flex items-center justify-center rounded text-[9px] font-mono p-1 text-center">
+                      [QR Code]
                     </div>
                   )}
                 </div>
@@ -596,7 +614,7 @@ export default function App() {
               <Sparkles className="w-5 h-5 text-indigo-400" />
               1-Bit Thermal Print Preview
             </h3>
-            <p className="text-xs text-slate-400 mb-4">Simulated monochrome 203 DPI thermal print head output</p>
+            <p className="text-xs text-slate-400 mb-4">Simulated monochrome 203 DPI thermal print head output (Rotated for Printhead)</p>
 
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 mb-6 flex items-center justify-center min-h-[200px]">
               {previewUrl ? (

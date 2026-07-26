@@ -29,18 +29,37 @@ export function mmToDots(mm, dpi = 203) {
 
 /**
  * Converts an HTML5 Canvas to a 1-bit packed TSPL bitmap Uint8Array payload.
+ * Automatically rotates landscape canvases 90 degrees clockwise to align with physical 14mm printhead.
  */
 export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, density = 3, copies = 1, ditherMethod = 'threshold') {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
+  let srcCanvas = canvas;
+  let printWidthMm = widthMm;
+  let printHeightMm = heightMm;
+
+  // Auto-rotate landscape canvas 90 degrees clockwise for physical 14mm printhead alignment
+  if (canvas.width > canvas.height) {
+    const rotCanvas = document.createElement('canvas');
+    rotCanvas.width = canvas.height;
+    rotCanvas.height = canvas.width;
+    const rotCtx = rotCanvas.getContext('2d');
+    
+    rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+    rotCtx.rotate(Math.PI / 2); // 90 deg clockwise
+    rotCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+    
+    srcCanvas = rotCanvas;
+    printWidthMm = heightMm;
+    printHeightMm = widthMm;
+  }
+
+  const ctx = srcCanvas.getContext('2d');
+  const w = srcCanvas.width;
+  const h = srcCanvas.height;
   const imgData = ctx.getImageData(0, 0, w, h);
   const pixels = imgData.data;
 
   // Compute padded width for 8-bit byte alignment
   const widthBytes = Math.ceil(w / 8);
-  const paddedWidthDots = widthBytes * 8;
-
   const rawBuffer = new Uint8Array(widthBytes * h);
   let idx = 0;
 
@@ -76,9 +95,9 @@ export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, d
     }
   }
 
-  // Construct TSPL text header & footer
+  // Construct TSPL text header & footer matching rotated printhead dimensions
   const encoder = new TextEncoder();
-  let headerStr = `SIZE ${widthMm.toFixed(1)} mm, ${heightMm.toFixed(1)} mm\r\n`;
+  let headerStr = `SIZE ${printWidthMm.toFixed(1)} mm, ${printHeightMm.toFixed(1)} mm\r\n`;
   headerStr += gapMm > 0 ? `GAP ${gapMm.toFixed(1)} mm, 0 mm\r\n` : `GAP 0 mm, 0 mm\r\n`;
   headerStr += `DIRECTION 0\r\n`;
   headerStr += `DENSITY ${density}\r\n`;
