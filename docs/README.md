@@ -29,20 +29,23 @@ The **Nelko P21** is a portable 203 DPI monochrome thermal label printer. While 
 
 ## 🗂 Documentation Sitemap
 
-1. [01_HARDWARE_AND_BLUETOOTH.md](file:///C:/Users/Alias/Downloads/nelko.apk_Decompiler.com/reverse_engineering/01_HARDWARE_AND_BLUETOOTH.md)  
+1. [01_HARDWARE_AND_BLUETOOTH.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/01_HARDWARE_AND_BLUETOOTH.md)  
    *Bluetooth RFCOMM socket connection, UUIDs, socket configuration, MTU/chunking logic, status polling, and ACK parsing.*
 
-2. [02_TSPL_PROTOCOL_SPEC.md](file:///C:/Users/Alias/Downloads/nelko.apk_Decompiler.com/reverse_engineering/02_TSPL_PROTOCOL_SPEC.md)  
+2. [02_TSPL_PROTOCOL_SPEC.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/02_TSPL_PROTOCOL_SPEC.md)  
    *Full specification of TSPL/TSPL2 commands used by Nelko P21 (`SIZE`, `GAP`, `SPEED`, `DENSITY`, `DIRECTION`, `CLS`, `BITMAP`, `PRINT`, `SOUND`, `~TS`, etc.).*
 
-3. [03_RASTERIZATION_AND_IMAGE_PROCESSING.md](file:///C:/Users/Alias/Downloads/nelko.apk_Decompiler.com/reverse_engineering/03_RASTERIZATION_AND_IMAGE_PROCESSING.md)  
+3. [03_RASTERIZATION_AND_IMAGE_PROCESSING.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/03_RASTERIZATION_AND_IMAGE_PROCESSING.md)  
    *Algorithms for converting graphics to 203 DPI 1-bit monochrome data, bit-packing, bit-inversion rules, row-stride padding, and dithering algorithms.*
 
-4. [04_DEVICE_MATRIX_AND_CONFIG.md](file:///C:/Users/Alias/Downloads/nelko.apk_Decompiler.com/reverse_engineering/04_DEVICE_MATRIX_AND_CONFIG.md)  
+4. [04_DEVICE_MATRIX_AND_CONFIG.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/04_DEVICE_MATRIX_AND_CONFIG.md)  
    *Comparative matrix of 28 Nelko printer models extracted from internal app configurations (`cloud_config_nelko.json`).*
 
-5. [05_PAPER_PRESETS_AND_RFID.md](file:///C:/Users/Alias/Downloads/nelko.apk_Decompiler.com/reverse_engineering/05_PAPER_PRESETS_AND_RFID.md)  
+5. [05_PAPER_PRESETS_AND_RFID.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/05_PAPER_PRESETS_AND_RFID.md)  
    *Paper types (Gap, Continuous, Black Mark), preset label sizes, paper code format, RFID tag serial translation, and margin offsets.*
+
+6. [06_ESP32_MULTI_NODE_BRIDGE.md](file:///C:/Users/Alias/Downloads/NelkoP21WebPrint/docs/06_ESP32_MULTI_NODE_BRIDGE.md)  
+   *Multi-floor ESP32 dev board setup, Bluetooth Classic hardware requirements, auto-discovery failover, and power considerations.*
 
 ---
 

@@ -5,20 +5,20 @@ import {
   Plus, 
   Type, 
   QrCode, 
-  Image as ImageIcon, 
-  Layers, 
   Sliders, 
-  Download, 
-  Upload, 
-  RotateCw, 
   Trash2, 
   Check, 
   RefreshCw,
   Eye,
   Sparkles,
   Grid,
-  FileText
+  FileText,
+  Smartphone,
+  Wifi,
+  Bluetooth
 } from 'lucide-react';
+import { browserBtDriver } from './utils/webBluetoothDriver';
+import { convertCanvasToTsplBytes, mmToDots } from './utils/tsplGenerator';
 
 const PRESETS = [
   { name: '14 x 40 mm (Standard Gap)', width: 14, height: 40, gap: 5 },
@@ -32,9 +32,6 @@ const PRESETS = [
 export default function App() {
   // Preset & Label Dimensions
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
-  const [customWidth, setCustomWidth] = useState(14);
-  const [customHeight, setCustomHeight] = useState(40);
-  const [gap, setGap] = useState(5);
 
   // Label Elements
   const [elements, setElements] = useState([
@@ -45,6 +42,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(1);
 
   // Print & Driver State
+  const [useBrowserBt, setUseBrowserBt] = useState(true); // Default to Browser Direct BT
+  const [browserBtConnected, setBrowserBtConnected] = useState(false);
+  const [browserBtDeviceName, setBrowserBtDeviceName] = useState('');
+  
   const [density, setDensity] = useState(3);
   const [copies, setCopies] = useState(1);
   const [ditherMethod, setDitherMethod] = useState('threshold');
@@ -56,7 +57,7 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
 
-  // Driver Config
+  // Driver Config for Server Bridge Mode
   const [driverConfig, setDriverConfig] = useState({
     driver_type: 'tcp',
     tcp_host: '127.0.0.1',
@@ -64,24 +65,37 @@ export default function App() {
     bt_mac: ''
   });
 
+  const canvasRef = useRef(null);
   const selectedElement = elements.find(el => el.id === selectedId);
+
+  // Calculate 203 DPI Canvas px size
+  const dpi = 203;
+  const canvasWidthPx = Math.round((selectedPreset.width * dpi) / 25.4);
+  const canvasHeightPx = Math.round((selectedPreset.height * dpi) / 25.4);
 
   // Fetch status on load
   useEffect(() => {
     fetch('/api/printer/status')
       .then(res => res.json())
       .then(data => {
-        if (data.config) {
-          setDriverConfig(data.config);
-        }
+        if (data.config) setDriverConfig(data.config);
       })
       .catch(() => {});
   }, []);
 
-  // Calculate 203 DPI Canvas px size
-  const dpi = 203;
-  const canvasWidthPx = Math.round((selectedPreset.width * dpi) / 25.4);
-  const canvasHeightPx = Math.round((selectedPreset.height * dpi) / 25.4);
+  // Connect Browser Bluetooth
+  const handleConnectBrowserBt = async () => {
+    setPrintStatus(null);
+    const res = await browserBtDriver.requestConnection();
+    if (res.success) {
+      setBrowserBtConnected(true);
+      setBrowserBtDeviceName(res.name);
+      setPrintStatus({ type: 'success', msg: `Connected to ${res.name} via browser Bluetooth!` });
+    } else {
+      setBrowserBtConnected(false);
+      setPrintStatus({ type: 'error', msg: res.error || 'Failed to connect via browser Bluetooth' });
+    }
+  };
 
   // Element Actions
   const addTextElement = () => {
@@ -123,7 +137,7 @@ export default function App() {
     setSelectedId(elements.length > 1 ? elements[0].id : null);
   };
 
-  // Generate Preview from API
+  // Generate Preview from API or Local Canvas
   const handleGeneratePreview = async () => {
     setShowPreview(true);
     try {
@@ -147,40 +161,84 @@ export default function App() {
     }
   };
 
-  // Handle Print Job
+  // Render HTML5 Canvas to 1-Bit TSPL payload
+  const renderCanvasToTsplBytes = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidthPx;
+    canvas.height = canvasHeightPx;
+    const ctx = canvas.getContext('2d');
+
+    // Fill White Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvasWidthPx, canvasHeightPx);
+
+    // Draw Elements
+    ctx.fillStyle = '#000000';
+    elements.forEach(el => {
+      if (el.type === 'text') {
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize * 2}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(el.content, (el.x / 100) * canvasWidthPx, (el.y / 100) * canvasHeightPx);
+      }
+    });
+
+    return convertCanvasToTsplBytes(canvas, selectedPreset.width, selectedPreset.height, selectedPreset.gap, density, copies, ditherMethod);
+  };
+
+  // Handle Print Job (Browser Direct vs Server Bridge)
   const handlePrint = async () => {
     setIsPrinting(true);
     setPrintStatus(null);
-    try {
-      const res = await fetch('/api/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
-          subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
-          barcode: elements.find(e => e.type === 'qr')?.content || '',
-          width_mm: selectedPreset.width,
-          height_mm: selectedPreset.height,
-          gap_mm: selectedPreset.gap,
-          density: density,
-          copies: copies,
-          dither_method: ditherMethod
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setPrintStatus({ type: 'success', msg: `Printed ${copies} copy successfully!` });
-      } else {
-        setPrintStatus({ type: 'error', msg: data.detail || 'Print failed' });
+
+    if (useBrowserBt) {
+      // 1. Direct Browser Bluetooth Mode
+      try {
+        const payloadBytes = renderCanvasToTsplBytes();
+        const success = await browserBtDriver.sendBytes(payloadBytes);
+        if (success) {
+          setPrintStatus({ type: 'success', msg: `Direct Browser BT: Printed ${copies} copy successfully!` });
+        } else {
+          setPrintStatus({ type: 'error', msg: 'Browser Bluetooth stream failed or device disconnected' });
+        }
+      } catch (err) {
+        setPrintStatus({ type: 'error', msg: `Direct Print Error: ${err.message}` });
+      } finally {
+        setIsPrinting(false);
       }
-    } catch (err) {
-      setPrintStatus({ type: 'error', msg: `Network Error: ${err.message}` });
-    } finally {
-      setIsPrinting(false);
+    } else {
+      // 2. Server Bridge Mode
+      try {
+        const res = await fetch('/api/print', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
+            subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
+            barcode: elements.find(e => e.type === 'qr')?.content || '',
+            width_mm: selectedPreset.width,
+            height_mm: selectedPreset.height,
+            gap_mm: selectedPreset.gap,
+            density: density,
+            copies: copies,
+            dither_method: ditherMethod
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setPrintStatus({ type: 'success', msg: `Server Printed ${copies} copy successfully!` });
+        } else {
+          setPrintStatus({ type: 'error', msg: data.detail || 'Print failed' });
+        }
+      } catch (err) {
+        setPrintStatus({ type: 'error', msg: `Network Error: ${err.message}` });
+      } finally {
+        setIsPrinting(false);
+      }
     }
   };
 
-  // Save Settings
+  // Save Config
   const handleSaveConfig = async () => {
     try {
       await fetch('/api/printer/config', {
@@ -211,15 +269,25 @@ export default function App() {
         </div>
 
         {/* Status Pill & Action Controls */}
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
-          >
-            <span className={`w-2 h-2 rounded-full ${driverConfig.driver_type === 'mock' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
-            <span>Driver: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
-            <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
-          </button>
+        <div className="flex items-center gap-3">
+          {useBrowserBt ? (
+            <button 
+              onClick={handleConnectBrowserBt}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair Phone/Browser BT'}</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
+            >
+              <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Server Bridge: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
+              <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            </button>
+          )}
 
           <button 
             onClick={handleGeneratePreview}
@@ -244,6 +312,28 @@ export default function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Toolbar / Presets */}
         <aside className="w-80 border-r border-slate-800 glass-panel p-5 flex flex-col gap-6 overflow-y-auto">
+          {/* Mode Switcher */}
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
+              Print Connection Target
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
+              <button 
+                onClick={() => setUseBrowserBt(true)}
+                className={`py-1.5 rounded-lg text-xs font-medium transition ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Browser Direct
+              </button>
+              <button 
+                onClick={() => setUseBrowserBt(false)}
+                className={`py-1.5 rounded-lg text-xs font-medium transition ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Server Bridge
+              </button>
+            </div>
+          </div>
+
           {/* Preset Selection */}
           <div>
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -426,7 +516,7 @@ export default function App() {
           <div className="w-full max-w-md glass-panel rounded-2xl p-6 border border-slate-800 shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Settings className="w-5 h-5 text-indigo-400" />
-              Printer Connection Settings
+              Server Printer Connection Settings
             </h3>
 
             <div className="flex flex-col gap-4">
