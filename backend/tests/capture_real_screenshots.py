@@ -8,8 +8,9 @@ def main():
     out_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "images"))
     os.makedirs(out_dir, exist_ok=True)
     
+    print("Starting Python HTTP server serving compiled static frontend...")
     server_process = subprocess.Popen(
-        [sys.executable, "-m", "http.server", "8005", "--directory", static_dir],
+        [sys.executable, "-m", "http.server", "8008", "--directory", static_dir],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )
@@ -21,12 +22,15 @@ def main():
     settings_path = os.path.join(out_dir, "connection_settings_modal.jpg")
 
     try:
-        # Main Studio
-        cmd = f'npx -y playwright screenshot --viewport-size=1600,900 --wait-for-timeout=2000 http://127.0.0.1:8005 "{studio_path}"'
-        subprocess.run(cmd, shell=True, check=True)
-        print(f"Captured real Main Studio screenshot: {studio_path}")
+        # 1. Main Studio Screenshot
+        cmd1 = f'npx -y playwright screenshot --viewport-size=1600,900 --wait-for-timeout=2000 http://127.0.0.1:8008 "{studio_path}"'
+        print(f"Capturing Main Studio: {cmd1}")
+        subprocess.run(cmd1, shell=True, check=True)
+
+        # 2. Click Settings button & capture Settings Modal
+        # Using Playwright node snippet via npx or python
     except Exception as e:
-        print(f"Error capturing real screenshot: {e}")
+        print(f"Error capturing real screenshots: {e}")
     finally:
         server_process.terminate()
         server_process.wait()
