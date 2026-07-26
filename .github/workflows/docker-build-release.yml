@@ -20,8 +20,30 @@ env:
   IMAGE_NAME: spelech/nelkop21webprint
 
 jobs:
-  # Job 1: Auto-generate SemVer tag if not manually tagged
+  # Job 1: Run Backend Unit & Integration Test Suite
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Backend Unit Tests
+        run: |
+          python backend/tests/run_tests.py
+
+  # Job 2: Auto-generate SemVer tag if not manually tagged
   semantic-versioning:
+    needs: [unit-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,9 +65,9 @@ jobs:
           DEFAULT_BUMP: patch
           RELEASE_BRANCHES: master,main
 
-  # Job 2: Build & Push Docker Container to GHCR using SemVer Tags
+  # Job 3: Build & Push Docker Container to GHCR using SemVer Tags
   build-and-push-docker:
-    needs: [semantic-versioning]
+    needs: [unit-tests, semantic-versioning]
     if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
