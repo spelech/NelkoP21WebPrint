@@ -16,7 +16,13 @@ import {
   Smartphone,
   Wifi,
   Bluetooth,
-  RotateCw
+  RotateCw,
+  Move,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  AlignCenter
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
@@ -43,6 +49,11 @@ export default function App() {
     { id: 3, type: 'qr', content: 'https://nelko.app', x: 75, y: 50, size: 70 }
   ]);
   const [selectedId, setSelectedId] = useState(1);
+
+  // Dragging state & refs
+  const containerRef = useRef(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   // Print & Driver State
   const [useBrowserBt, setUseBrowserBt] = useState(true);
@@ -79,6 +90,100 @@ export default function App() {
   const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
   const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
 
+  // Drag Event Handlers
+  const handleStartDrag = (e, id) => {
+    e.stopPropagation();
+    if (!containerRef.current) return;
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const cursorX = ((clientX - rect.left) / rect.width) * 100;
+    const cursorY = ((clientY - rect.top) / rect.height) * 100;
+
+    const el = elements.find(item => item.id === id);
+    if (el) {
+      dragOffsetRef.current = { x: cursorX - el.x, y: cursorY - el.y };
+    } else {
+      dragOffsetRef.current = { x: 0, y: 0 };
+    }
+
+    setSelectedId(id);
+    setDraggingId(id);
+  };
+
+  // Global mousemove/mouseup listener while dragging
+  useEffect(() => {
+    if (draggingId === null) return;
+
+    const handlePointerMove = (e) => {
+      if (!containerRef.current) return;
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const cursorX = ((clientX - rect.left) / rect.width) * 100;
+      const cursorY = ((clientY - rect.top) / rect.height) * 100;
+
+      let newX = cursorX - dragOffsetRef.current.x;
+      let newY = cursorY - dragOffsetRef.current.y;
+
+      // Clamp between 0 and 100%
+      newX = Math.max(0, Math.min(100, Math.round(newX * 10) / 10));
+      newY = Math.max(0, Math.min(100, Math.round(newY * 10) / 10));
+
+      setElements(prev => prev.map(el => el.id === draggingId ? { ...el, x: newX, y: newY } : el));
+    };
+
+    const handlePointerUp = () => {
+      setDraggingId(null);
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('touchend', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+  }, [draggingId]);
+
+  // Keyboard shortcut listener for moving elements with arrow keys
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedId) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+      const step = e.shiftKey ? 5 : 1;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, x: Math.max(0, Math.round((el.x - step) * 10) / 10) } : el));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, x: Math.min(100, Math.round((el.x + step) * 10) / 10) } : el));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, y: Math.max(0, Math.round((el.y - step) * 10) / 10) } : el));
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, y: Math.min(100, Math.round((el.y + step) * 10) / 10) } : el));
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteSelectedElement();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId]);
+
   // Fetch status on load
   useEffect(() => {
     fetch('/api/printer/status')
@@ -111,7 +216,7 @@ export default function App() {
       content: 'New Text',
       fontSize: 16,
       fontStyle: 'normal',
-      x: 30,
+      x: 50,
       y: 50,
       width: 160,
       height: 25,
@@ -126,7 +231,7 @@ export default function App() {
       id: Date.now(),
       type: 'qr',
       content: 'P21-LABEL-123',
-      x: 75,
+      x: 50,
       y: 50,
       size: 60
     };
@@ -138,22 +243,65 @@ export default function App() {
     setElements(elements.map(el => el.id === selectedId ? { ...el, [key]: val } : el));
   };
 
+  const nudgeSelectedElement = (dx, dy) => {
+    if (!selectedElement) return;
+    const newX = Math.max(0, Math.min(100, Math.round((selectedElement.x + dx) * 10) / 10));
+    const newY = Math.max(0, Math.min(100, Math.round((selectedElement.y + dy) * 10) / 10));
+    updateSelectedElement('x', newX);
+    updateSelectedElement('y', newY);
+  };
+
   const deleteSelectedElement = () => {
     setElements(elements.filter(el => el.id !== selectedId));
     setSelectedId(elements.length > 1 ? elements[0].id : null);
   };
 
+  // Offscreen canvas builder helper for preview & print rasterization
+  const buildOffscreenCanvas = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidthPx;
+    canvas.height = canvasHeightPx;
+    const ctx = canvas.getContext('2d');
+
+    // Fill White Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvasWidthPx, canvasHeightPx);
+
+    // Draw Elements
+    ctx.fillStyle = '#000000';
+    elements.forEach(el => {
+      const posX = (el.x / 100) * canvasWidthPx;
+      const posY = (el.y / 100) * canvasHeightPx;
+
+      if (el.type === 'text') {
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize * 2}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(el.content, posX, posY);
+      } else if (el.type === 'qr') {
+        const qrSize = (el.size || 60) * 1.2;
+        ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
+      }
+    });
+
+    return canvas;
+  };
+
   // Generate Preview from API
   const handleGeneratePreview = async () => {
     setShowPreview(true);
+    setPreviewUrl(null);
     try {
-      const res = await fetch('/api/preview', {
+      const canvas = buildOffscreenCanvas();
+      const res = await fetch('/api/preview/canvas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
-          subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
-          barcode: elements.find(e => e.type === 'qr')?.content || '',
+          image_base64: canvas.toDataURL('image/png'),
           width_mm: activeWidthMm,
           height_mm: activeHeightMm,
           gap_mm: selectedPreset.gap,
@@ -169,26 +317,7 @@ export default function App() {
 
   // Render HTML5 Canvas to 1-Bit TSPL payload
   const renderCanvasToTsplBytes = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasWidthPx;
-    canvas.height = canvasHeightPx;
-    const ctx = canvas.getContext('2d');
-
-    // Fill White Background
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvasWidthPx, canvasHeightPx);
-
-    // Draw Elements
-    ctx.fillStyle = '#000000';
-    elements.forEach(el => {
-      if (el.type === 'text') {
-        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize * 2}px Inter, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(el.content, (el.x / 100) * canvasWidthPx, (el.y / 100) * canvasHeightPx);
-      }
-    });
-
+    const canvas = buildOffscreenCanvas();
     return convertCanvasToTsplBytes(canvas, activeWidthMm, activeHeightMm, selectedPreset.gap, density, copies, ditherMethod);
   };
 
@@ -213,13 +342,12 @@ export default function App() {
       }
     } else {
       try {
-        const res = await fetch('/api/print', {
+        const canvas = buildOffscreenCanvas();
+        const res = await fetch('/api/print/canvas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: elements.find(e => e.type === 'text')?.content || 'Nelko P21',
-            subtitle: elements.filter(e => e.type === 'text')[1]?.content || '',
-            barcode: elements.find(e => e.type === 'qr')?.content || '',
+            image_base64: canvas.toDataURL('image/png'),
             width_mm: activeWidthMm,
             height_mm: activeHeightMm,
             gap_mm: selectedPreset.gap,
@@ -257,7 +385,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 select-none">
       {/* Top Navigation Bar */}
       <header className="h-16 border-b border-slate-800 glass-panel px-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
@@ -434,6 +562,104 @@ export default function App() {
                   />
                 </div>
               )}
+
+              {/* Position & Alignment Controls */}
+              <div className="border-t border-slate-800/60 pt-3 flex flex-col gap-3">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Move className="w-3.5 h-3.5 text-indigo-400" />
+                  Position & Alignment
+                </span>
+
+                {/* Numerical Sliders */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-400">Position X</label>
+                      <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.x)}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={selectedElement.x}
+                      onChange={(e) => updateSelectedElement('x', parseFloat(e.target.value))}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-400">Position Y</label>
+                      <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.y)}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={selectedElement.y}
+                      onChange={(e) => updateSelectedElement('y', parseFloat(e.target.value))}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Align & Nudge */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-slate-400">Quick Align & Nudge</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <button 
+                      onClick={() => updateSelectedElement('x', 50)}
+                      className="px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition flex items-center gap-1"
+                      title="Center Horizontally"
+                    >
+                      <AlignCenter className="w-3.5 h-3.5 text-indigo-400" />
+                      Center X
+                    </button>
+                    <button 
+                      onClick={() => updateSelectedElement('y', 50)}
+                      className="px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition flex items-center gap-1"
+                      title="Center Vertically"
+                    >
+                      <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" />
+                      Center Y
+                    </button>
+
+                    {/* D-Pad Nudge Buttons */}
+                    <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+                      <div></div>
+                      <button 
+                        onClick={() => nudgeSelectedElement(0, -2)}
+                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
+                        title="Nudge Up"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <div></div>
+                      <button 
+                        onClick={() => nudgeSelectedElement(-2, 0)}
+                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
+                        title="Nudge Left"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => nudgeSelectedElement(0, 2)}
+                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
+                        title="Nudge Down"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => nudgeSelectedElement(2, 0)}
+                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
+                        title="Nudge Right"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
@@ -493,36 +719,68 @@ export default function App() {
               </span>
             </div>
 
+            {/* Hint Badge */}
+            <div className="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 mb-4 flex items-center gap-1.5 shadow-sm">
+              <Move className="w-3 h-3 text-indigo-400" />
+              <span>Click & drag elements on label • Use Arrow Keys to nudge (Shift + Arrow for 5%)</span>
+            </div>
+
             {/* Label Paper Sheet */}
             <div 
+              ref={containerRef}
+              onClick={() => setSelectedId(null)}
               style={{ width: `${canvasWidthPx * 1.5}px`, height: `${canvasHeightPx * 1.5}px` }}
-              className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex items-center justify-between text-slate-900 transition-all overflow-hidden"
+              className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex items-center justify-between text-slate-900 transition-all overflow-hidden select-none"
             >
-              {elements.map(el => (
-                <div 
-                  key={el.id}
-                  onClick={() => setSelectedId(el.id)}
-                  style={{
-                    position: 'absolute',
-                    left: `${el.x}%`,
-                    top: `${el.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                    cursor: 'pointer'
-                  }}
-                  className={`p-1 rounded border-2 transition whitespace-nowrap ${selectedId === el.id ? 'border-indigo-600 bg-indigo-50/50' : 'border-transparent hover:border-slate-300'}`}
-                >
-                  {el.type === 'text' && (
-                    <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
-                      {el.content}
-                    </span>
-                  )}
-                  {el.type === 'qr' && (
-                    <div className="w-14 h-14 bg-slate-900 text-white flex items-center justify-center rounded text-[9px] font-mono p-1 text-center">
-                      [QR Code]
-                    </div>
-                  )}
-                </div>
-              ))}
+              {elements.map(el => {
+                const isSelected = selectedId === el.id;
+                const isBeingDragged = draggingId === el.id;
+
+                return (
+                  <div 
+                    key={el.id}
+                    onMouseDown={(e) => handleStartDrag(e, el.id)}
+                    onTouchStart={(e) => handleStartDrag(e, el.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(el.id);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: `${el.x}%`,
+                      top: `${el.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      cursor: isBeingDragged ? 'grabbing' : 'grab'
+                    }}
+                    className={`p-1.5 rounded border-2 transition-all group whitespace-nowrap ${
+                      isSelected 
+                        ? 'border-indigo-600 bg-indigo-50/70 shadow-md ring-2 ring-indigo-500/20 z-20' 
+                        : 'border-dashed border-transparent hover:border-slate-400 hover:bg-slate-50/50 z-10'
+                    }`}
+                  >
+                    {/* Position Badge when selected or dragging */}
+                    {isSelected && (
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-2 py-0.5 rounded-full shadow flex items-center gap-1 pointer-events-none whitespace-nowrap z-30">
+                        <Move className="w-2.5 h-2.5" />
+                        <span>X: {Math.round(el.x)}% Y: {Math.round(el.y)}%</span>
+                      </div>
+                    )}
+
+                    {el.type === 'text' && (
+                      <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
+                        {el.content}
+                      </span>
+                    )}
+
+                    {el.type === 'qr' && (
+                      <div className="w-14 h-14 bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner">
+                        <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
+                        <span>[QR Code]</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </main>
