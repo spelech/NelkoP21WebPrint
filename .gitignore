@@ -1,0 +1,18 @@
+# Node dependencies & build output
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/static/
+
+# Python cache & venv
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# Environment & IDE
+.env
+.DS_Store
+.vscode/
+.idea/
