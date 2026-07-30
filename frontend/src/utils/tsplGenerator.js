@@ -31,7 +31,7 @@ export function mmToDots(mm, dpi = 203) {
  * Converts an HTML5 Canvas to a 1-bit packed TSPL bitmap Uint8Array payload.
  * Automatically rotates landscape canvases 90 degrees clockwise to align with physical 14mm printhead.
  */
-export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, density = 3, copies = 1, ditherMethod = 'threshold') {
+export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, density = 3, copies = 1, ditherMethod = 'threshold', invertColors = false) {
   let srcCanvas = canvas;
   let printWidthMm = widthMm;
   let printHeightMm = heightMm;
@@ -86,7 +86,11 @@ export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, d
             isBlack = lum < 128; // Default thresholding
           }
 
-          if (isBlack) {
+          // TSPL BITMAP Bit Mapping on Nelko P21:
+          // 0 bit = Black pixel (thermal pin fires)
+          // 1 bit = White paper (thermal pin off)
+          const setBit = invertColors ? isBlack : !isBlack;
+          if (setBit) {
             byteVal |= (1 << (7 - bit)); // MSB to LSB bit setting
           }
         }

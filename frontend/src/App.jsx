@@ -75,6 +75,8 @@ export default function App() {
   const [density, setDensity] = useState(3);
   const [copies, setCopies] = useState(1);
   const [ditherMethod, setDitherMethod] = useState('threshold');
+  const [invertColors, setInvertColors] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1.5);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
@@ -332,7 +334,7 @@ export default function App() {
   // Render HTML5 Canvas to 1-Bit TSPL payload
   const renderCanvasToTsplBytes = () => {
     const canvas = buildOffscreenCanvas();
-    return convertCanvasToTsplBytes(canvas, activeWidthMm, activeHeightMm, selectedPreset.gap, density, copies, ditherMethod);
+    return convertCanvasToTsplBytes(canvas, activeWidthMm, activeHeightMm, selectedPreset.gap, density, copies, ditherMethod, invertColors);
   };
 
   // Handle Print Job
@@ -716,6 +718,18 @@ export default function App() {
                 />
               </div>
             </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={invertColors}
+                  onChange={(e) => setInvertColors(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                />
+                Invert Colors (White-on-Black)
+              </label>
+            </div>
           </div>
         </aside>
 
@@ -733,22 +747,39 @@ export default function App() {
             <div className="text-xs text-slate-400 mb-3 flex items-center gap-2">
               <FileText className="w-3.5 h-3.5 text-indigo-400" />
               <span>
-                Canvas Workspace ({activeWidthMm}mm × {activeHeightMm}mm @ 203 DPI) 
+                Canvas Workspace ({activeWidthMm}mm × {activeHeightMm}mm @ 203 DPI = {canvasWidthPx}px × {canvasHeightPx}px) 
                 <span className="ml-2 text-indigo-400 font-medium">({isPortraitView ? 'Portrait View' : 'Landscape View - Auto 90° Rotated for Printhead'})</span>
               </span>
             </div>
 
-            {/* Hint Badge */}
-            <div className="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 mb-4 flex items-center gap-1.5 shadow-sm">
-              <Move className="w-3 h-3 text-indigo-400" />
-              <span>Click & drag elements on label • Use Arrow Keys to nudge (Shift + Arrow for 5%)</span>
+            {/* Hint & Zoom Controls */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 flex items-center gap-1.5 shadow-sm">
+                <Move className="w-3 h-3 text-indigo-400" />
+                <span>Click & drag elements on label • Use Arrow Keys to nudge (Shift + Arrow for 5%)</span>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-full border border-slate-800 text-[11px]">
+                <span className="text-slate-400 px-2 font-medium">Zoom:</span>
+                {[1.0, 1.5, 2.0].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setZoomScale(s)}
+                    className={`px-2 py-0.5 rounded-full font-mono text-[10px] transition ${zoomScale === s ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    {s * 100}%
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Label Paper Sheet */}
             <div 
               ref={containerRef}
               onClick={() => setSelectedId(null)}
-              style={{ width: `${canvasWidthPx * 1.5}px`, height: `${canvasHeightPx * 1.5}px` }}
+              style={{ 
+                width: `${canvasWidthPx * zoomScale}px`, 
+                height: `${canvasHeightPx * zoomScale}px` 
+              }}
               className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex items-center justify-between text-slate-900 transition-all overflow-hidden select-none"
             >
               {elements.map(el => {

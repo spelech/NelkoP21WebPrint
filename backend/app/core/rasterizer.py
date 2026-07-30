@@ -73,9 +73,9 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
             byte_val = 0
             for bit in range(8):
                 x = x_byte * 8 + bit
-                # In PIL "1" mode: 0 = Black, 1 = White
-                # In TSPL BITMAP: 1 = Black (fire thermal pin), 0 = White
-                if pixels[x, y] == 0:
+                # In PIL "1" mode: 0 = Black pixel, 1 = White pixel
+                # In TSPL BITMAP on Nelko P21: 0 bit = Black (thermal pin fires), 1 bit = White paper
+                if pixels[x, y] == 1:  # Set bit for White paper, leave 0 for Black
                     byte_val |= (1 << (7 - bit))  # Set bit (MSB-first)
             raw_bytes[idx] = byte_val
             idx += 1

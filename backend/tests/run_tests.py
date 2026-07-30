@@ -29,7 +29,7 @@ class TestRasterizer(unittest.TestCase):
         self.assertEqual(width_bytes, 14)
         self.assertEqual(height_dots, 320)
         self.assertEqual(len(raw_bytes), 14 * 320)
-        self.assertEqual(raw_bytes[0], 0xFF)
+        self.assertEqual(raw_bytes[0], 0x00)  # 0x00 = All black (thermal pins fire)
 
     def test_auto_rotate_landscape(self):
         # Landscape image 320x112 should rotate to 112x320 for 14mm printhead
