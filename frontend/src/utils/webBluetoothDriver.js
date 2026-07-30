@@ -27,14 +27,27 @@ class WebBluetoothPrinterDriver {
    */
   async requestConnection() {
     try {
-      // 1. Try Web Serial API first (Supported in Chrome Android & Desktop for Bluetooth Serial ports)
+      // 1. Try Web Serial API first (Supported in Chrome Android & Desktop for Bluetooth & USB Serial ports)
       if ('serial' in navigator) {
         this.serialPort = await navigator.serial.requestPort();
-        await this.serialPort.open({ baudRate: 9600 });
+        
+        // Try opening with standard baud rates (9600 first, fallback to 115200)
+        try {
+          await this.serialPort.open({ baudRate: 9600 });
+        } catch (openErr) {
+          try {
+            await this.serialPort.open({ baudRate: 115200 });
+          } catch (retryErr) {
+            throw new Error(`Failed to open serial port (${openErr.message}). NOTE for Windows: Bluetooth SPP creates 2 COM ports (Incoming & Outgoing). Please try selecting the OTHER "Standard Serial over Bluetooth" port in the list, or connect via USB cable.`);
+          }
+        }
+
         this.writer = this.serialPort.writable.getWriter();
         this.isConnected = true;
         const info = this.serialPort.getInfo ? this.serialPort.getInfo() : {};
-        const rawName = info.usbVendorId ? `Serial Device (0x${info.usbVendorId.toString(16)})` : 'Nelko P21 (Web Serial)';
+        const rawName = info.usbVendorId 
+          ? `USB Printer (0x${info.usbVendorId.toString(16)})` 
+          : 'Nelko P21 (Serial Port)';
         this.deviceName = rawName;
         return { success: true, name: this.deviceName, verified: true, type: 'web-serial' };
       }

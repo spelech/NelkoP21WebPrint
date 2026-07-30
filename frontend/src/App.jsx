@@ -953,20 +953,27 @@ export default function App() {
               </button>
             </div>
 
-            {/* Tab 1: PC Direct (Web Serial) */}
+            {/* Tab 1: PC Direct (Web Serial & USB) */}
             {wizardTab === 'pc' && (
               <div className="flex flex-col gap-4 text-sm text-slate-300">
                 <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
                   <div className="flex items-start gap-2.5">
                     <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
                     <p className="text-xs">
-                      <strong>Pair in PC OS Settings first:</strong> Nelko P21 uses <em>Bluetooth Classic SPP</em>. Turn on printer and pair it under <strong>Windows Settings → Bluetooth</strong> or <strong>macOS Bluetooth</strong> (it appears as <code>P21</code> or <code>Nelko-P21</code>).
+                      <strong>Bluetooth SPP Setup:</strong> Pair <code>P21</code> or <code>Nelko-P21</code> in <strong>Windows/macOS Bluetooth Settings</strong> first.
                     </p>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
                     <p className="text-xs">
-                      <strong>Connect Bluetooth COM Port:</strong> Click the button below to launch Chrome's Web Serial picker, then select the <code>Standard Serial over Bluetooth</code> port.
+                      <strong>Select Bluetooth COM Port:</strong> Click below to launch Chrome's Web Serial picker and select <code>Standard Serial over Bluetooth</code>. 
+                      <span className="text-amber-400 font-medium block mt-1">⚠️ Windows Gotcha: Windows creates TWO COM ports (Incoming & Outgoing). If the first one fails or hangs, re-open and select the SECOND Bluetooth port in the list!</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5 pt-1 border-t border-slate-800/80">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">🔌</span>
+                    <p className="text-xs">
+                      <strong>USB Cable Alternative (Instant Plug-and-Play):</strong> Plug the Nelko P21 directly into your PC via USB-C cable, click below, and select the USB Serial port!
                     </p>
                   </div>
                 </div>
@@ -979,15 +986,15 @@ export default function App() {
                   >
                     <span className="flex items-center gap-1.5">
                       <HelpCircle className="w-4 h-4" />
-                      Don't see your P21 printer in the list?
+                      Troubleshooting & Connecting Issues
                     </span>
                     {showHelpAccordion ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                   {showHelpAccordion && (
                     <div className="p-4 pt-0 border-t border-slate-800 text-xs text-slate-400 space-y-2">
-                      <p>• <strong>Why didn't it show up in standard Bluetooth scan?</strong> Web Bluetooth API only scans for BLE devices. The P21 requires Web Serial COM port mapping.</p>
-                      <p>• <strong>Ensure HTTPS:</strong> Browser Web Serial requires HTTPS (<code>https://labelprint.wileyriley.com</code>) or <code>localhost</code>.</p>
-                      <p>• <strong>Re-pair printer:</strong> Remove <code>P21</code> from PC Bluetooth settings and re-pair if the COM port fails to open.</p>
+                      <p>• <strong>Why standard Bluetooth scan won't work:</strong> Web Bluetooth API only scans for BLE devices. The P21 is Bluetooth Classic SPP, which operates via Web Serial COM ports on PC.</p>
+                      <p>• <strong>Failed to open port error:</strong> Make sure no other software (or print spooler) is using the COM port. If on Windows, try selecting the other `Standard Serial over Bluetooth` entry.</p>
+                      <p>• <strong>HTTPS Required:</strong> Web Serial requires <code>https://labelprint.wileyriley.com</code> or <code>localhost</code>.</p>
                     </div>
                   )}
                 </div>
