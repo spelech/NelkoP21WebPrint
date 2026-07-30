@@ -22,7 +22,14 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
-  AlignCenter
+  AlignCenter,
+  Monitor,
+  HelpCircle,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
@@ -59,6 +66,10 @@ export default function App() {
   const [useBrowserBt, setUseBrowserBt] = useState(true);
   const [browserBtConnected, setBrowserBtConnected] = useState(false);
   const [browserBtDeviceName, setBrowserBtDeviceName] = useState('');
+  
+  const [showWizardModal, setShowWizardModal] = useState(false);
+  const [wizardTab, setWizardTab] = useState('pc');
+  const [showHelpAccordion, setShowHelpAccordion] = useState(false);
   
   const [density, setDensity] = useState(3);
   const [copies, setCopies] = useState(1);
@@ -202,6 +213,7 @@ export default function App() {
       setBrowserBtConnected(true);
       setBrowserBtDeviceName(res.name);
       setPrintStatus({ type: 'success', msg: `Connected to ${res.name} via browser Bluetooth!` });
+      setShowWizardModal(false);
     } else {
       setBrowserBtConnected(false);
       setPrintStatus({ type: 'error', msg: res.error || 'Failed to connect via browser Bluetooth' });
@@ -404,11 +416,11 @@ export default function App() {
         <div className="flex items-center gap-3">
           {useBrowserBt ? (
             <button 
-              onClick={handleConnectBrowserBt}
+              onClick={() => setShowWizardModal(true)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
             >
               <Smartphone className="w-3.5 h-3.5" />
-              <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair Phone/Browser BT'}</span>
+              <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair PC/Browser BT'}</span>
             </button>
           ) : (
             <button 
@@ -888,6 +900,160 @@ export default function App() {
             >
               Close Preview
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Printer Connection Wizard Modal */}
+      {showWizardModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-xl glass-panel rounded-2xl p-6 border border-slate-800 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Bluetooth className="w-5 h-5 text-indigo-400" />
+                Nelko P21 Connection Wizard
+              </h3>
+              <button 
+                onClick={() => setShowWizardModal(false)}
+                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Connection Tabs */}
+            <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800 mb-6">
+              <button 
+                onClick={() => setWizardTab('pc')}
+                className={`py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${wizardTab === 'pc' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Monitor className="w-4 h-4" />
+                PC (Web Serial)
+              </button>
+              <button 
+                onClick={() => setWizardTab('mobile')}
+                className={`py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${wizardTab === 'mobile' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Smartphone className="w-4 h-4" />
+                Mobile Direct
+              </button>
+              <button 
+                onClick={() => setWizardTab('bridge')}
+                className={`py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${wizardTab === 'bridge' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Wifi className="w-4 h-4" />
+                Server Bridge
+              </button>
+            </div>
+
+            {/* Tab 1: PC Direct (Web Serial) */}
+            {wizardTab === 'pc' && (
+              <div className="flex flex-col gap-4 text-sm text-slate-300">
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                    <p className="text-xs">
+                      <strong>Pair in PC OS Settings first:</strong> Nelko P21 uses <em>Bluetooth Classic SPP</em>. Turn on printer and pair it under <strong>Windows Settings → Bluetooth</strong> or <strong>macOS Bluetooth</strong> (it appears as <code>P21</code> or <code>Nelko-P21</code>).
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                    <p className="text-xs">
+                      <strong>Connect Bluetooth COM Port:</strong> Click the button below to launch Chrome's Web Serial picker, then select the <code>Standard Serial over Bluetooth</code> port.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Don't See Printer Accordion */}
+                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
+                  <button 
+                    onClick={() => setShowHelpAccordion(!showHelpAccordion)}
+                    className="w-full p-3 flex items-center justify-between text-xs font-medium text-indigo-300 hover:text-indigo-200 transition"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <HelpCircle className="w-4 h-4" />
+                      Don't see your P21 printer in the list?
+                    </span>
+                    {showHelpAccordion ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                  {showHelpAccordion && (
+                    <div className="p-4 pt-0 border-t border-slate-800 text-xs text-slate-400 space-y-2">
+                      <p>• <strong>Why didn't it show up in standard Bluetooth scan?</strong> Web Bluetooth API only scans for BLE devices. The P21 requires Web Serial COM port mapping.</p>
+                      <p>• <strong>Ensure HTTPS:</strong> Browser Web Serial requires HTTPS (<code>https://labelprint.wileyriley.com</code>) or <code>localhost</code>.</p>
+                      <p>• <strong>Re-pair printer:</strong> Remove <code>P21</code> from PC Bluetooth settings and re-pair if the COM port fails to open.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button 
+                    onClick={handleConnectBrowserBt}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    <Bluetooth className="w-4 h-4" />
+                    Pair & Connect PC Serial Port
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Mobile Direct */}
+            {wizardTab === 'mobile' && (
+              <div className="flex flex-col gap-4 text-sm text-slate-300">
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                    <p className="text-xs">
+                      <strong>Open in Mobile Chrome / WebBLE:</strong> Open <code>https://labelprint.wileyriley.com</code> on Chrome (Android) or WebBLE browser (iOS).
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                    <p className="text-xs">
+                      <strong>Select Printer:</strong> Ensure green power light is on and tap <strong>Connect Mobile Bluetooth</strong> to pair.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button 
+                    onClick={handleConnectBrowserBt}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    Pair & Connect Mobile Bluetooth
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Server Bridge */}
+            {wizardTab === 'bridge' && (
+              <div className="flex flex-col gap-4 text-sm text-slate-300">
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <p className="text-xs text-slate-300">
+                    <strong>Zero-Pairing Network Printing:</strong> Connect printer directly to the home server via an <strong>ESP32 Wi-Fi Bridge</strong> (TCP Port 9100) or host Linux Bluetooth driver (<code>/dev/rfcomm0</code>).
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Allows any device, phone, or Home Assistant automation to print instantly without pairing Bluetooth in the browser.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button 
+                    onClick={() => {
+                      setUseBrowserBt(false);
+                      setShowWizardModal(false);
+                      setShowSettings(true);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure Server Bridge Settings
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
