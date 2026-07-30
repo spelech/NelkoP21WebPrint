@@ -772,16 +772,17 @@ export default function App() {
               </div>
             </div>
 
-            {/* Label Paper Sheet */}
-            <div 
-              ref={containerRef}
-              onClick={() => setSelectedId(null)}
-              style={{ 
-                width: `${canvasWidthPx * zoomScale}px`, 
-                height: `${canvasHeightPx * zoomScale}px` 
-              }}
-              className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative p-4 flex items-center justify-between text-slate-900 transition-all overflow-hidden select-none"
-            >
+            {/* Scalable Label Paper Sheet Wrapper */}
+            <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="transition-transform duration-200 my-4">
+              <div 
+                ref={containerRef}
+                onClick={() => setSelectedId(null)}
+                style={{ 
+                  width: `${canvasWidthPx}px`, 
+                  height: `${canvasHeightPx}px` 
+                }}
+                className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative flex items-center justify-between text-slate-900 overflow-hidden select-none"
+              >
               {elements.map(el => {
                 const isSelected = selectedId === el.id;
                 const isBeingDragged = draggingId === el.id;
@@ -833,7 +834,8 @@ export default function App() {
               })}
             </div>
           </div>
-        </main>
+        </div>
+      </main>
       </div>
 
       {/* Settings Modal */}
