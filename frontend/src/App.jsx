@@ -956,24 +956,30 @@ export default function App() {
             {/* Tab 1: PC Direct (Web Serial & USB) */}
             {wizardTab === 'pc' && (
               <div className="flex flex-col gap-4 text-sm text-slate-300">
+                <div className="bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-rose-200 leading-relaxed">
+                    <strong>Windows Bluetooth Limitation:</strong> Windows OS frequently fails to pair or connect over Bluetooth to Nelko P21 chips. If Windows Bluetooth won't connect, browser Bluetooth cannot connect either.
+                  </div>
+                </div>
+
                 <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
                   <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
-                    <p className="text-xs">
-                      <strong>Bluetooth SPP Setup:</strong> Pair <code>P21</code> or <code>Nelko-P21</code> in <strong>Windows/macOS Bluetooth Settings</strong> first.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
-                    <p className="text-xs">
-                      <strong>Select Bluetooth COM Port:</strong> Click below to launch Chrome's Web Serial picker and select <code>Standard Serial over Bluetooth</code>. 
-                      <span className="text-amber-400 font-medium block mt-1">⚠️ Windows Gotcha: Windows creates TWO COM ports (Incoming & Outgoing). If the first one fails or hangs, re-open and select the SECOND Bluetooth port in the list!</span>
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5 pt-1 border-t border-slate-800/80">
                     <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">🔌</span>
                     <p className="text-xs">
-                      <strong>USB Cable Alternative (Instant Plug-and-Play):</strong> Plug the Nelko P21 directly into your PC via USB-C cable, click below, and select the USB Serial port!
+                      <strong>Option 1 (USB Cable - Recommended for PC):</strong> Plug the Nelko P21 directly into your PC via USB-C cable. Click below and select the USB Serial port!
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5 pt-2 border-t border-slate-800/80">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">🌐</span>
+                    <p className="text-xs">
+                      <strong>Option 2 (Server Bridge Mode - Wireless Printing):</strong> Switch to <strong>Server Bridge Mode</strong> in the top header. The home server at <code>10.0.0.10</code> prints directly over TCP/Bluetooth so any PC on your network can print wirelessly without PC Bluetooth setup!
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5 pt-2 border-t border-slate-800/80">
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">📶</span>
+                    <p className="text-xs">
+                      <strong>Option 3 (Bluetooth SPP COM Port):</strong> If Windows paired successfully, click below and select <code>Standard Serial over Bluetooth</code>. <em>(Note: Windows creates 2 COM ports; try the second entry if the first fails).</em>
                     </p>
                   </div>
                 </div>
