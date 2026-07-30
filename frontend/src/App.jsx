@@ -2249,7 +2249,13 @@ export default function App() {
                         left: `${el.x}%`,
                         top: `${el.y}%`,
                         transform: 'translate(-50%, -50%)',
-                        maxWidth: 'none'
+                        maxWidth: 'none',
+                        width: el.type === 'qr' ? `${el.size || 60}px` :
+                               el.type === 'image' ? `${el.width || 60}px` :
+                               el.type === 'barcode' ? `${el.width || 100}px` :
+                               el.type === 'line' ? `${el.width || 120}px` :
+                               el.type === 'rectangle' ? `${el.width || 160}px` :
+                               'max-content'
                       }}
                       className="p-1.5 whitespace-nowrap text-slate-900"
                     >
@@ -2350,7 +2356,13 @@ export default function App() {
                           top: `${el.y}%`,
                           transform: 'translate(-50%, -50%)',
                           cursor: isBeingDragged ? 'grabbing' : 'grab',
-                          maxWidth: 'none'
+                          maxWidth: 'none',
+                          width: el.type === 'qr' ? `${el.size || 60}px` :
+                                 el.type === 'image' ? `${el.width || 60}px` :
+                                 el.type === 'barcode' ? `${el.width || 100}px` :
+                                 el.type === 'line' ? `${el.width || 120}px` :
+                                 el.type === 'rectangle' ? `${el.width || 160}px` :
+                                 'max-content'
                         }}
                         className={`p-1.5 rounded border-2 group whitespace-nowrap ${
                           isSelected 
