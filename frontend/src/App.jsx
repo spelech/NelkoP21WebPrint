@@ -611,15 +611,19 @@ export default function App() {
                 </button>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Content</label>
-                <input 
-                  type="text" 
-                  value={selectedElement.content}
-                  onChange={(e) => updateSelectedElement('content', e.target.value)}
-                  className="w-full p-2.5 rounded-xl glass-input text-sm"
-                />
-              </div>
+              {selectedElement.type !== 'image' && (
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">
+                    {selectedElement.type === 'qr' ? 'QR Code Text / URL' : 'Text Content'}
+                  </label>
+                  <input 
+                    type="text" 
+                    value={selectedElement.content || ''}
+                    onChange={(e) => updateSelectedElement('content', e.target.value)}
+                    className="w-full p-2.5 rounded-xl glass-input text-sm"
+                  />
+                </div>
+              )}
 
               {selectedElement.type === 'text' && (
                 <div>
@@ -627,11 +631,83 @@ export default function App() {
                   <input 
                     type="range" 
                     min="8" 
-                    max="48" 
-                    value={selectedElement.fontSize}
+                    max="64" 
+                    value={selectedElement.fontSize || 22}
                     onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
                     className="w-full accent-indigo-500"
                   />
+                </div>
+              )}
+
+              {selectedElement.type === 'qr' && (
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
+                  <input 
+                    type="range" 
+                    min="20" 
+                    max="180" 
+                    value={selectedElement.size || 60}
+                    onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+              )}
+
+              {selectedElement.type === 'image' && (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-400">Image Width</label>
+                      <span className="text-xs font-mono text-indigo-300">{selectedElement.width || 60}px</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="300" 
+                      value={selectedElement.width || 60}
+                      onChange={(e) => {
+                        const newW = parseInt(e.target.value);
+                        const ratio = (selectedElement.height || 60) / (selectedElement.width || 60);
+                        if (selectedElement.keepRatio !== false && ratio) {
+                          setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, width: newW, height: Math.round(newW * ratio) } : el));
+                        } else {
+                          updateSelectedElement('width', newW);
+                        }
+                      }}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-400">Image Height</label>
+                      <span className="text-xs font-mono text-indigo-300">{selectedElement.height || 60}px</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="300" 
+                      value={selectedElement.height || 60}
+                      onChange={(e) => {
+                        const newH = parseInt(e.target.value);
+                        const ratio = (selectedElement.width || 60) / (selectedElement.height || 60);
+                        if (selectedElement.keepRatio !== false && ratio) {
+                          setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, height: newH, width: Math.round(newH * ratio) } : el));
+                        } else {
+                          updateSelectedElement('height', newH);
+                        }
+                      }}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pt-1">
+                    <input 
+                      type="checkbox"
+                      checked={selectedElement.keepRatio !== false}
+                      onChange={(e) => updateSelectedElement('keepRatio', e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                    />
+                    Lock Aspect Ratio
+                  </label>
                 </div>
               )}
 
@@ -824,7 +900,7 @@ export default function App() {
             </div>
 
             {/* Scalable Label Paper Sheet Wrapper */}
-            <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="transition-transform duration-200 my-4">
+            <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="my-4">
               <div 
                 ref={containerRef}
                 onClick={() => setSelectedId(null)}
@@ -854,7 +930,10 @@ export default function App() {
                       )}
 
                       {el.type === 'qr' && (
-                        <div className="w-14 h-14 bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner">
+                        <div 
+                          style={{ width: `${(el.size || 60) * 0.8}px`, height: `${(el.size || 60) * 0.8}px` }} 
+                          className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner"
+                        >
                           <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
                           <span>[QR Code]</span>
                         </div>
@@ -894,7 +973,7 @@ export default function App() {
                           transform: 'translate(-50%, -50%)',
                           cursor: isBeingDragged ? 'grabbing' : 'grab'
                         }}
-                        className={`p-1.5 rounded border-2 transition-all group whitespace-nowrap ${
+                        className={`p-1.5 rounded border-2 group whitespace-nowrap ${
                           isSelected 
                             ? 'border-indigo-600 bg-indigo-500/10 shadow-md ring-2 ring-indigo-500/20 z-20' 
                             : 'border-dashed border-transparent hover:border-slate-400 hover:bg-slate-500/10 z-10'
@@ -915,7 +994,9 @@ export default function App() {
                               {el.content}
                             </span>
                           )}
-                          {el.type === 'qr' && <div className="w-14 h-14" />}
+                          {el.type === 'qr' && (
+                            <div style={{ width: `${(el.size || 60) * 0.8}px`, height: `${(el.size || 60) * 0.8}px` }} />
+                          )}
                           {el.type === 'image' && (
                             <div style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px` }} />
                           )}
