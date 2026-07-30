@@ -1665,7 +1665,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 select-none">
+    <div className="h-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden">
       {/* Top Navigation Bar */}
       <header className="h-14 md:h-16 border-b border-slate-800 glass-panel px-4 md:px-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-2.5">
