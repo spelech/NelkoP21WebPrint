@@ -953,65 +953,41 @@ export default function App() {
               </button>
             </div>
 
-            {/* Tab 1: PC Direct (Web Serial & USB) */}
+            {/* Tab 1: PC Direct vs Server Bridge */}
             {wizardTab === 'pc' && (
               <div className="flex flex-col gap-4 text-sm text-slate-300">
-                <div className="bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl flex items-start gap-2.5">
+                <div className="bg-rose-500/10 border border-rose-500/30 p-3.5 rounded-xl flex items-start gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-rose-200 leading-relaxed">
-                    <strong>Windows Bluetooth Limitation:</strong> Windows OS frequently fails to pair or connect over Bluetooth to Nelko P21 chips. If Windows Bluetooth won't connect, browser Bluetooth cannot connect either.
+                  <div className="text-xs text-rose-200 leading-relaxed space-y-1">
+                    <p><strong>Hardware & PC Compatibility Fact:</strong></p>
+                    <p>1. The Nelko P21's USB-C port is <em>power charging ONLY</em> (no USB data controller hardware).</p>
+                    <p>2. Windows OS Bluetooth stack fails to negotiate RFCOMM sockets with Nelko printer chips, preventing PC browser direct Bluetooth connection.</p>
                   </div>
                 </div>
 
                 <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
                   <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">🔌</span>
-                    <p className="text-xs">
-                      <strong>Option 1 (USB Cable - Recommended for PC):</strong> Plug the Nelko P21 directly into your PC via USB-C cable. Click below and select the USB Serial port!
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5 pt-2 border-t border-slate-800/80">
                     <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">🌐</span>
-                    <p className="text-xs">
-                      <strong>Option 2 (Server Bridge Mode - Wireless Printing):</strong> Switch to <strong>Server Bridge Mode</strong> in the top header. The home server at <code>10.0.0.10</code> prints directly over TCP/Bluetooth so any PC on your network can print wirelessly without PC Bluetooth setup!
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5 pt-2 border-t border-slate-800/80">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">📶</span>
-                    <p className="text-xs">
-                      <strong>Option 3 (Bluetooth SPP COM Port):</strong> If Windows paired successfully, click below and select <code>Standard Serial over Bluetooth</code>. <em>(Note: Windows creates 2 COM ports; try the second entry if the first fails).</em>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Don't See Printer Accordion */}
-                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
-                  <button 
-                    onClick={() => setShowHelpAccordion(!showHelpAccordion)}
-                    className="w-full p-3 flex items-center justify-between text-xs font-medium text-indigo-300 hover:text-indigo-200 transition"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <HelpCircle className="w-4 h-4" />
-                      Troubleshooting & Connecting Issues
-                    </span>
-                    {showHelpAccordion ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {showHelpAccordion && (
-                    <div className="p-4 pt-0 border-t border-slate-800 text-xs text-slate-400 space-y-2">
-                      <p>• <strong>Why standard Bluetooth scan won't work:</strong> Web Bluetooth API only scans for BLE devices. The P21 is Bluetooth Classic SPP, which operates via Web Serial COM ports on PC.</p>
-                      <p>• <strong>Failed to open port error:</strong> Make sure no other software (or print spooler) is using the COM port. If on Windows, try selecting the other `Standard Serial over Bluetooth` entry.</p>
-                      <p>• <strong>HTTPS Required:</strong> Web Serial requires <code>https://labelprint.wileyriley.com</code> or <code>localhost</code>.</p>
+                    <div>
+                      <p className="text-xs font-semibold text-white">Recommended PC Solution: Server Bridge Mode</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Switch to <strong>Server Bridge Mode</strong>. The home server container at <code>10.0.0.10</code> (or ESP32 node) handles the Bluetooth connection to the printer directly. You can click <strong>Print</strong> from any PC, Mac, or browser on your home network with zero PC Bluetooth pairing!
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button 
-                    onClick={handleConnectBrowserBt}
+                    onClick={() => {
+                      setUseBrowserBt(false);
+                      setShowWizardModal(false);
+                      setShowSettings(true);
+                    }}
                     className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
                   >
-                    <Bluetooth className="w-4 h-4" />
-                    Pair & Connect PC Serial Port
+                    <Wifi className="w-4 h-4" />
+                    Switch to Server Bridge Mode
                   </button>
                 </div>
               </div>
