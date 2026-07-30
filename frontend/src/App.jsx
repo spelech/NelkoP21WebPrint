@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
+import QRCode from 'qrcode';
 
 // Presets oriented in Landscape view (Width x Height) for optimal readable workspace
 const PRESETS = [
@@ -54,6 +55,30 @@ export default function App() {
   // Label Elements
   const [elements, setElements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+
+  // Cache for preloaded QR Code images (for real scannable rendering on screen and canvas)
+  const [qrCache, setQrCache] = useState({});
+
+  useEffect(() => {
+    const qrElements = elements.filter(el => el.type === 'qr');
+    qrElements.forEach(el => {
+      const cacheKey = el.content;
+      if (cacheKey && !qrCache[cacheKey]) {
+        QRCode.toDataURL(cacheKey, { margin: 1 })
+          .then(url => {
+            const img = new Image();
+            img.onload = () => {
+              setQrCache(prev => ({
+                ...prev,
+                [cacheKey]: { url, img }
+              }));
+            };
+            img.src = url;
+          })
+          .catch(err => console.error('Failed to generate QR:', err));
+      }
+    });
+  }, [elements, qrCache]);
 
   // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
   const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
@@ -325,11 +350,17 @@ export default function App() {
         ctx.fillText(el.content, posX, posY);
       } else if (el.type === 'qr') {
         const qrSize = (el.size || 60);
-        ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
+        const cached = qrCache[el.content];
+        if (cached && cached.img) {
+          ctx.drawImage(cached.img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        } else {
+          // Fallback: draw mock nested squares until loaded
+          ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
+        }
       } else if (el.type === 'image' && el.url) {
         const img = el.imgObject || new Image();
         if (!el.imgObject) img.src = el.url;
@@ -963,13 +994,22 @@ export default function App() {
                       )}
 
                       {el.type === 'qr' && (
-                        <div 
-                          style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }} 
-                          className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner overflow-hidden"
-                        >
-                          <QrCode className="w-1/2 h-1/2 mb-0.5 text-indigo-300 min-w-[16px] min-h-[16px]" />
-                          {(el.size || 60) >= 50 && <span className="text-[8px] opacity-80 leading-none">[QR Code]</span>}
-                        </div>
+                        qrCache[el.content] && qrCache[el.content].url ? (
+                          <img 
+                            src={qrCache[el.content].url} 
+                            alt="QR Code" 
+                            style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }}
+                            className="shadow-sm"
+                          />
+                        ) : (
+                          <div 
+                            style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }} 
+                            className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner overflow-hidden"
+                          >
+                            <QrCode className="w-1/2 h-1/2 mb-0.5 text-indigo-300 min-w-[16px] min-h-[16px]" />
+                            {(el.size || 60) >= 50 && <span className="text-[8px] opacity-80 leading-none">[QR Code]</span>}
+                          </div>
+                        )
                       )}
 
                       {el.type === 'image' && (
