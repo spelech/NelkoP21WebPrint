@@ -16,6 +16,12 @@ class WebBluetoothPrinterDriver {
     this.deviceName = '';
   }
 
+  isPrinterName(name) {
+    if (!name) return false;
+    const lower = name.toLowerCase();
+    return lower.includes('nelko') || lower.includes('p21') || lower.includes('printer') || lower.includes('tspl') || lower.includes('com') || lower.includes('serial');
+  }
+
   /**
    * Request Bluetooth Serial or Web Serial connection from user browser.
    */
@@ -27,8 +33,10 @@ class WebBluetoothPrinterDriver {
         await this.serialPort.open({ baudRate: 9600 });
         this.writer = this.serialPort.writable.getWriter();
         this.isConnected = true;
-        this.deviceName = 'Nelko P21 (Web Serial)';
-        return { success: true, name: this.deviceName, type: 'web-serial' };
+        const info = this.serialPort.getInfo ? this.serialPort.getInfo() : {};
+        const rawName = info.usbVendorId ? `Serial Device (0x${info.usbVendorId.toString(16)})` : 'Nelko P21 (Web Serial)';
+        this.deviceName = rawName;
+        return { success: true, name: this.deviceName, verified: true, type: 'web-serial' };
       }
 
       // 2. Try Web Bluetooth API fallback
@@ -45,7 +53,7 @@ class WebBluetoothPrinterDriver {
           this.gattCharacteristic = characteristics[0];
           this.isConnected = true;
           this.deviceName = this.gattDevice.name || 'Nelko P21 (Web Bluetooth)';
-          return { success: true, name: this.deviceName, type: 'web-bluetooth' };
+          return { success: true, name: this.deviceName, verified: this.isPrinterName(this.deviceName), type: 'web-bluetooth' };
         }
       }
 
