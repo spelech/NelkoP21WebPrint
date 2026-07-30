@@ -52,12 +52,11 @@ export default function App() {
   const [isPortraitView, setIsPortraitView] = useState(false); // Default to Landscape view
 
   // Label Elements
-  const [elements, setElements] = useState([
-    { id: 1, type: 'text', content: 'NELKO P21', fontSize: 22, fontStyle: 'bold', x: 25, y: 35, width: 180, height: 30, align: 'center' },
-    { id: 2, type: 'text', content: 'ASSET TAG', fontSize: 13, fontStyle: 'normal', x: 25, y: 70, width: 180, height: 20, align: 'center' },
-    { id: 3, type: 'qr', content: 'https://nelko.app', x: 75, y: 50, size: 70 }
-  ]);
-  const [selectedId, setSelectedId] = useState(1);
+  const [elements, setElements] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
+  const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
 
   // Dragging state & refs
   const containerRef = useRef(null);
@@ -436,165 +435,190 @@ export default function App() {
     }
   };
 
+  // Sidebar content as a reusable component (rendered in desktop aside OR mobile panel)
+  const SidebarContent = ({ mobileTab }) => (
+    <>
+      {/* Connection Target Switcher — always visible */}
+      {(!mobileTab || mobileTab === 'print') && (
+        <div>
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
+            Print Connection Target
+          </label>
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
+            <button 
+              onClick={() => setUseBrowserBt(true)}
+              className={`py-1.5 rounded-lg text-xs font-medium transition ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Browser Direct
+            </button>
+            <button 
+              onClick={() => setUseBrowserBt(false)}
+              className={`py-1.5 rounded-lg text-xs font-medium transition ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Server Bridge
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Preset Selection — show in desktop, or 'add' mobile tab */}
+      {(!mobileTab || mobileTab === 'add') && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Grid className="w-3.5 h-3.5 text-indigo-400" />
+              Label Preset
+            </label>
+            <button 
+              onClick={() => setIsPortraitView(!isPortraitView)}
+              className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+              title="Toggle Landscape / Portrait Editing View"
+            >
+              <RotateCw className="w-3 h-3" />
+              {isPortraitView ? 'Portrait' : 'Landscape'}
+            </button>
+          </div>
+          <select 
+            value={selectedPreset.name}
+            onChange={(e) => {
+              const preset = PRESETS.find(p => p.name === e.target.value);
+              if (preset) setSelectedPreset(preset);
+            }}
+            className="w-full p-2.5 rounded-xl glass-input text-sm"
+          >
+            {PRESETS.map(p => (
+              <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Add Elements — show in desktop, or 'add' mobile tab */}
+      {(!mobileTab || mobileTab === 'add') && (
+        <div>
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5 text-indigo-400" />
+            Add Elements
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button 
+              onClick={addTextElement}
+              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+            >
+              <Type className="w-4 h-4 text-indigo-400" />
+              Text
+            </button>
+            <button 
+              onClick={addQRElement}
+              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+            >
+              <QrCode className="w-4 h-4 text-violet-400" />
+              QR
+            </button>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+              title="Upload Graphic / Logo / Image"
+            >
+              <ImageIcon className="w-4 h-4 text-emerald-400" />
+              Image
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 select-none">
       {/* Top Navigation Bar */}
-      <header className="h-16 border-b border-slate-800 glass-panel px-6 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Printer className="w-5 h-5 text-white" />
+      <header className="h-14 md:h-16 border-b border-slate-800 glass-panel px-4 md:px-6 flex items-center justify-between z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <Printer className="w-4 h-4 md:w-5 md:h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
+              <h1 className="text-base md:text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
                 Nelko P21 Studio
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-mono font-semibold">
                 v{appVersion}
               </span>
             </div>
-            <p className="text-xs text-slate-400">203 DPI Thermal Label Engine</p>
+            <p className="hidden md:block text-xs text-slate-400">203 DPI Thermal Label Engine</p>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-3">
-          {useBrowserBt ? (
+        {/* Action Controls — compact on mobile */}
+        <div className="flex items-center gap-2">
+          {/* Connection button hidden on mobile (accessible via Print tab) */}
+          <div className="hidden md:flex items-center gap-3">
+            {useBrowserBt ? (
+              <button 
+                onClick={() => setShowWizardModal(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair PC/Browser BT'}</span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
+              >
+                <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Server Bridge: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
+                <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
+              </button>
+            )}
             <button 
-              onClick={() => setShowWizardModal(true)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
+              onClick={handleGeneratePreview}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition shadow-sm"
             >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair PC/Browser BT'}</span>
+              <Eye className="w-4 h-4 text-indigo-400" />
+              Preview
             </button>
-          ) : (
-            <button 
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
-            >
-              <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Server Bridge: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
-              <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
-            </button>
-          )}
+          </div>
 
+          {/* Preview button visible on mobile */}
           <button 
             onClick={handleGeneratePreview}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition shadow-sm"
+            className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition shadow-sm"
           >
-            <Eye className="w-4 h-4 text-indigo-400" />
+            <Eye className="w-3.5 h-3.5 text-indigo-400" />
             Preview
           </button>
 
           <button 
             onClick={handlePrint}
             disabled={isPrinting}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+            className="flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs md:text-sm font-semibold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
           >
             {isPrinting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-            Print Label
+            <span className="hidden sm:inline">Print Label</span>
+            <span className="sm:hidden">Print</span>
           </button>
         </div>
       </header>
 
       {/* Main Layout Grid */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Toolbar / Presets */}
-        <aside className="w-80 border-r border-slate-800 glass-panel p-5 flex flex-col gap-6 overflow-y-auto">
-          {/* Connection Target Switcher */}
-          <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
-              Print Connection Target
-            </label>
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
-              <button 
-                onClick={() => setUseBrowserBt(true)}
-                className={`py-1.5 rounded-lg text-xs font-medium transition ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Browser Direct
-              </button>
-              <button 
-                onClick={() => setUseBrowserBt(false)}
-                className={`py-1.5 rounded-lg text-xs font-medium transition ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Server Bridge
-              </button>
-            </div>
-          </div>
+        {/* Left Toolbar / Presets — desktop only */}
+        <aside className="hidden md:flex w-80 border-r border-slate-800 glass-panel p-5 flex-col gap-6 overflow-y-auto">
+          <SidebarContent mobileTab={null} />
 
-          {/* Preset Selection */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Grid className="w-3.5 h-3.5 text-indigo-400" />
-                Label Preset
-              </label>
-              <button 
-                onClick={() => setIsPortraitView(!isPortraitView)}
-                className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
-                title="Toggle Landscape / Portrait Editing View"
-              >
-                <RotateCw className="w-3 h-3" />
-                {isPortraitView ? 'Portrait' : 'Landscape'}
-              </button>
-            </div>
-            <select 
-              value={selectedPreset.name}
-              onChange={(e) => {
-                const preset = PRESETS.find(p => p.name === e.target.value);
-                if (preset) setSelectedPreset(preset);
-              }}
-              className="w-full p-2.5 rounded-xl glass-input text-sm"
-            >
-              {PRESETS.map(p => (
-                <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Add Elements Section */}
-          <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5 text-indigo-400" />
-              Add Elements
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button 
-                onClick={addTextElement}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
-              >
-                <Type className="w-3.5 h-3.5 text-indigo-400" />
-                Text
-              </button>
-              <button 
-                onClick={addQRElement}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
-              >
-                <QrCode className="w-3.5 h-3.5 text-violet-400" />
-                QR
-              </button>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
-                title="Upload Graphic / Logo / Image"
-              >
-                <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
-                Image
-              </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImageUpload} 
-                accept="image/*" 
-                className="hidden" 
-              />
-            </div>
-          </div>
-
-          {/* Element Inspector */}
+          {/* Element Inspector — desktop */}
           {selectedElement ? (
             <div className="flex-1 flex flex-col gap-4 border-t border-slate-800/80 pt-4">
               <div className="flex items-center justify-between">
@@ -861,7 +885,7 @@ export default function App() {
         </aside>
 
         {/* Center Canvas Studio (Wide Landscape Workspace) */}
-        <main className="flex-1 bg-slate-900/50 p-8 flex flex-col items-center justify-center relative overflow-auto">
+        <main className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-center relative overflow-auto pb-20 md:pb-0">
           {printStatus && (
             <div className={`absolute top-6 px-4 py-2 rounded-xl text-sm font-medium shadow-lg z-20 flex items-center gap-2 ${printStatus.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
               {printStatus.type === 'success' ? <Check className="w-4 h-4" /> : null}
@@ -910,7 +934,16 @@ export default function App() {
                 }}
                 className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative select-none overflow-visible"
               >
-                {/* LAYER 1: Inner Clipped Paper Sheet (Clips text/graphics that spill off label paper edge) */}
+                {/* Empty canvas hint */}
+                {elements.length === 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-300/40 select-none gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    <span className="text-[11px] font-medium text-center px-3 leading-tight">Add elements from the sidebar<br className="hidden md:inline" /><span className="md:hidden"> or </span>or Add tab</span>
+                  </div>
+                )}
+
                 <div className="absolute inset-0 overflow-hidden rounded-md pointer-events-none">
                   {elements.map(el => (
                     <div 
@@ -1009,6 +1042,165 @@ export default function App() {
           </div>
         </div>
       </main>
+      </div>
+
+      {/* Mobile Bottom Panel — slides up when a non-canvas tab is active */}
+      <div className="md:hidden">
+        {/* Mobile Panel Content */}
+        {mobilePanelTab !== 'canvas' && (
+          <div className="fixed inset-x-0 bottom-14 z-40 bg-slate-900 border-t border-slate-800 shadow-2xl max-h-[60vh] overflow-y-auto p-4 flex flex-col gap-4">
+            {(mobilePanelTab === 'add') && (
+              <SidebarContent mobileTab="add" />
+            )}
+            {(mobilePanelTab === 'inspector') && (
+              <>
+                {selectedElement ? (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                        Element Properties
+                      </span>
+                      <button 
+                        onClick={deleteSelectedElement}
+                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
+                        title="Delete element"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {selectedElement.type !== 'image' && (
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">
+                          {selectedElement.type === 'qr' ? 'QR Code Text / URL' : 'Text Content'}
+                        </label>
+                        <input 
+                          type="text" 
+                          value={selectedElement.content || ''}
+                          onChange={(e) => updateSelectedElement('content', e.target.value)}
+                          className="w-full p-2.5 rounded-xl glass-input text-sm"
+                        />
+                      </div>
+                    )}
+                    {selectedElement.type === 'text' && (
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
+                        <input type="range" min="8" max="64" value={selectedElement.fontSize || 22}
+                          onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
+                          className="w-full accent-indigo-500" />
+                      </div>
+                    )}
+                    {selectedElement.type === 'qr' && (
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
+                        <input type="range" min="20" max="180" value={selectedElement.size || 60}
+                          onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
+                          className="w-full accent-indigo-500" />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs text-slate-400">Position X</label>
+                          <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.x)}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={selectedElement.x}
+                          onChange={(e) => updateSelectedElement('x', parseFloat(e.target.value))}
+                          className="w-full accent-indigo-500" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs text-slate-400">Position Y</label>
+                          <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.y)}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={selectedElement.y}
+                          onChange={(e) => updateSelectedElement('y', parseFloat(e.target.value))}
+                          className="w-full accent-indigo-500" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => updateSelectedElement('x', 50)}
+                        className="flex-1 px-2 py-2 rounded-lg glass-input text-xs font-medium flex items-center justify-center gap-1">
+                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400" /> Center X
+                      </button>
+                      <button onClick={() => updateSelectedElement('y', 50)}
+                        className="flex-1 px-2 py-2 rounded-lg glass-input text-xs font-medium flex items-center justify-center gap-1">
+                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" /> Center Y
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500 text-sm gap-3">
+                    <Sliders className="w-8 h-8 text-slate-700" />
+                    <p>Tap an element on the canvas to inspect it</p>
+                  </div>
+                )}
+              </>
+            )}
+            {(mobilePanelTab === 'print') && (
+              <div className="flex flex-col gap-4">
+                <SidebarContent mobileTab="print" />
+                <div className="border-t border-slate-800 pt-3 flex flex-col gap-3">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                    Print Parameters
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
+                      <input type="range" min="0" max="15" value={density}
+                        onChange={(e) => setDensity(parseInt(e.target.value))}
+                        className="w-full accent-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Copies</label>
+                      <input type="number" min="1" max="100" value={copies}
+                        onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                        className="w-full p-2 rounded-xl glass-input text-xs" />
+                    </div>
+                  </div>
+                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={invertColors}
+                      onChange={(e) => setInvertColors(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500" />
+                    Invert Colors (White-on-Black)
+                  </label>
+                  <button onClick={() => setShowWizardModal(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition">
+                    <Bluetooth className="w-4 h-4 text-indigo-400" />
+                    Connection Wizard
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mobile Bottom Tab Bar */}
+        <nav className="fixed bottom-0 inset-x-0 z-50 h-14 bg-slate-900 border-t border-slate-800 grid grid-cols-4">
+          {[
+            { id: 'canvas', icon: <Monitor className="w-5 h-5" />, label: 'Canvas' },
+            { id: 'add', icon: <Plus className="w-5 h-5" />, label: 'Add' },
+            { id: 'inspector', icon: <Sliders className="w-5 h-5" />, label: 'Inspector' },
+            { id: 'print', icon: <Printer className="w-5 h-5" />, label: 'Print' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMobilePanelTab(tab.id)}
+              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition ${
+                mobilePanelTab === tab.id
+                  ? 'text-indigo-400 bg-indigo-500/10'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {tab.id === 'inspector' && selectedElement && (
+                <span className="absolute mt-[-18px] ml-4 w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              )}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Settings Modal */}
