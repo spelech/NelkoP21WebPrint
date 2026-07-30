@@ -832,67 +832,99 @@ export default function App() {
                   width: `${canvasWidthPx}px`, 
                   height: `${canvasHeightPx}px` 
                 }}
-                className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative flex items-center justify-between text-slate-900 overflow-visible select-none"
+                className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative select-none overflow-visible"
               >
-              {elements.map(el => {
-                const isSelected = selectedId === el.id;
-                const isBeingDragged = draggingId === el.id;
+                {/* LAYER 1: Inner Clipped Paper Sheet (Clips text/graphics that spill off label paper edge) */}
+                <div className="absolute inset-0 overflow-hidden rounded-md pointer-events-none">
+                  {elements.map(el => (
+                    <div 
+                      key={el.id}
+                      style={{
+                        position: 'absolute',
+                        left: `${el.x}%`,
+                        top: `${el.y}%`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                      className="p-1.5 whitespace-nowrap text-slate-900"
+                    >
+                      {el.type === 'text' && (
+                        <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
+                          {el.content}
+                        </span>
+                      )}
 
-                return (
-                  <div 
-                    key={el.id}
-                    onMouseDown={(e) => handleStartDrag(e, el.id)}
-                    onTouchStart={(e) => handleStartDrag(e, el.id)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedId(el.id);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: `${el.x}%`,
-                      top: `${el.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      cursor: isBeingDragged ? 'grabbing' : 'grab'
-                    }}
-                    className={`p-1.5 rounded border-2 transition-all group whitespace-nowrap ${
-                      isSelected 
-                        ? 'border-indigo-600 bg-indigo-50/70 shadow-md ring-2 ring-indigo-500/20 z-20' 
-                        : 'border-dashed border-transparent hover:border-slate-400 hover:bg-slate-50/50 z-10'
-                    }`}
-                  >
-                    {/* Position Badge when selected or dragging (Never clipped by top edge) */}
-                    {isSelected && (
-                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-2 py-0.5 rounded-full shadow flex items-center gap-1 pointer-events-none whitespace-nowrap z-30">
-                        <Move className="w-2.5 h-2.5" />
-                        <span>X: {Math.round(el.x)}% Y: {Math.round(el.y)}%</span>
+                      {el.type === 'qr' && (
+                        <div className="w-14 h-14 bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner">
+                          <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
+                          <span>[QR Code]</span>
+                        </div>
+                      )}
+
+                      {el.type === 'image' && (
+                        <img 
+                          src={el.url} 
+                          alt="Uploaded Graphic" 
+                          style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px`, objectFit: 'contain' }}
+                          className="rounded shadow-sm"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* LAYER 2: Interactive Handles & Position Badges (Floats outside without clipping) */}
+                <div className="absolute inset-0 overflow-visible">
+                  {elements.map(el => {
+                    const isSelected = selectedId === el.id;
+                    const isBeingDragged = draggingId === el.id;
+
+                    return (
+                      <div 
+                        key={el.id}
+                        onMouseDown={(e) => handleStartDrag(e, el.id)}
+                        onTouchStart={(e) => handleStartDrag(e, el.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(el.id);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          left: `${el.x}%`,
+                          top: `${el.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          cursor: isBeingDragged ? 'grabbing' : 'grab'
+                        }}
+                        className={`p-1.5 rounded border-2 transition-all group whitespace-nowrap ${
+                          isSelected 
+                            ? 'border-indigo-600 bg-indigo-500/10 shadow-md ring-2 ring-indigo-500/20 z-20' 
+                            : 'border-dashed border-transparent hover:border-slate-400 hover:bg-slate-500/10 z-10'
+                        }`}
+                      >
+                        {/* Position Badge floating outside without clipping */}
+                        {isSelected && (
+                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-2 py-0.5 rounded-full shadow flex items-center gap-1 pointer-events-none whitespace-nowrap z-30">
+                            <Move className="w-2.5 h-2.5" />
+                            <span>X: {Math.round(el.x)}% Y: {Math.round(el.y)}%</span>
+                          </div>
+                        )}
+
+                        {/* Transparent Footprint for Click/Drag Targeting */}
+                        <div className="opacity-0 pointer-events-none">
+                          {el.type === 'text' && (
+                            <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
+                              {el.content}
+                            </span>
+                          )}
+                          {el.type === 'qr' && <div className="w-14 h-14" />}
+                          {el.type === 'image' && (
+                            <div style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px` }} />
+                          )}
+                        </div>
                       </div>
-                    )}
-
-                    {el.type === 'text' && (
-                      <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
-                        {el.content}
-                      </span>
-                    )}
-
-                    {el.type === 'qr' && (
-                      <div className="w-14 h-14 bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner">
-                        <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
-                        <span>[QR Code]</span>
-                      </div>
-                    )}
-
-                    {el.type === 'image' && (
-                      <img 
-                        src={el.url} 
-                        alt="Uploaded Graphic" 
-                        style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px`, objectFit: 'contain' }}
-                        className="pointer-events-none rounded shadow-sm"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              </div>
           </div>
         </div>
       </main>
