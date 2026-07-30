@@ -319,12 +319,12 @@ export default function App() {
       const posY = (el.y / 100) * canvasHeightPx;
 
       if (el.type === 'text') {
-        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize * 2}px Inter, sans-serif`;
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(el.content, posX, posY);
       } else if (el.type === 'qr') {
-        const qrSize = (el.size || 60) * 1.2;
+        const qrSize = (el.size || 60);
         ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
@@ -964,11 +964,11 @@ export default function App() {
 
                       {el.type === 'qr' && (
                         <div 
-                          style={{ width: `${(el.size || 60) * 0.8}px`, height: `${(el.size || 60) * 0.8}px` }} 
-                          className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner"
+                          style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }} 
+                          className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner overflow-hidden"
                         >
-                          <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
-                          <span>[QR Code]</span>
+                          <QrCode className="w-1/2 h-1/2 mb-0.5 text-indigo-300 min-w-[16px] min-h-[16px]" />
+                          {(el.size || 60) >= 50 && <span className="text-[8px] opacity-80 leading-none">[QR Code]</span>}
                         </div>
                       )}
 
@@ -976,7 +976,7 @@ export default function App() {
                         <img 
                           src={el.url} 
                           alt="Uploaded Graphic" 
-                          style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px`, objectFit: 'contain' }}
+                          style={{ width: `${el.width || 60}px`, height: `${el.height || 60}px`, objectFit: 'contain' }}
                           className="rounded shadow-sm"
                         />
                       )}
@@ -1028,10 +1028,10 @@ export default function App() {
                             </span>
                           )}
                           {el.type === 'qr' && (
-                            <div style={{ width: `${(el.size || 60) * 0.8}px`, height: `${(el.size || 60) * 0.8}px` }} />
+                            <div style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }} />
                           )}
                           {el.type === 'image' && (
-                            <div style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px` }} />
+                            <div style={{ width: `${el.width || 60}px`, height: `${el.height || 60}px` }} />
                           )}
                         </div>
                       </div>
