@@ -1,8 +1,11 @@
 import os
 from pydantic_settings import BaseSettings
 
-VERSION_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "..", "VERSION")
-default_version = "1.1.0"
+VERSION_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "VERSION")
+if not os.path.exists(VERSION_FILE):
+    VERSION_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "..", "VERSION")
+
+default_version = "1.1.4"
 if os.path.exists(VERSION_FILE):
     try:
         with open(VERSION_FILE, "r") as f:
