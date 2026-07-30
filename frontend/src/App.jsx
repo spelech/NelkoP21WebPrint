@@ -29,7 +29,9 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
@@ -242,6 +244,8 @@ export default function App() {
     setSelectedId(newEl.id);
   };
 
+  const fileInputRef = useRef(null);
+
   const addQRElement = () => {
     const newEl = {
       id: Date.now(),
@@ -253,6 +257,32 @@ export default function App() {
     };
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onload = () => {
+        const newEl = {
+          id: Date.now(),
+          type: 'image',
+          url: evt.target.result,
+          x: 50,
+          y: 50,
+          width: 60,
+          height: 60,
+          imgObject: img
+        };
+        setElements(prev => [...prev, newEl]);
+        setSelectedId(newEl.id);
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const updateSelectedElement = (key, val) => {
@@ -301,6 +331,12 @@ export default function App() {
         ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
         ctx.fillStyle = '#000000';
         ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
+      } else if (el.type === 'image' && el.url) {
+        const img = el.imgObject || new Image();
+        if (!el.imgObject) img.src = el.url;
+        const imgW = (el.width || 60);
+        const imgH = (el.height || 60);
+        ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
       }
     });
 
@@ -525,21 +561,36 @@ export default function App() {
               <Plus className="w-3.5 h-3.5 text-indigo-400" />
               Add Elements
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button 
                 onClick={addTextElement}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
               >
-                <Type className="w-4 h-4 text-indigo-400" />
+                <Type className="w-3.5 h-3.5 text-indigo-400" />
                 Text
               </button>
               <button 
                 onClick={addQRElement}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
               >
-                <QrCode className="w-4 h-4 text-violet-400" />
-                QR Code
+                <QrCode className="w-3.5 h-3.5 text-violet-400" />
+                QR
               </button>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+                title="Upload Graphic / Logo / Image"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                Image
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImageUpload} 
+                accept="image/*" 
+                className="hidden" 
+              />
             </div>
           </div>
 
@@ -781,7 +832,7 @@ export default function App() {
                   width: `${canvasWidthPx}px`, 
                   height: `${canvasHeightPx}px` 
                 }}
-                className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative flex items-center justify-between text-slate-900 overflow-hidden select-none"
+                className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative flex items-center justify-between text-slate-900 overflow-visible select-none"
               >
               {elements.map(el => {
                 const isSelected = selectedId === el.id;
@@ -809,7 +860,7 @@ export default function App() {
                         : 'border-dashed border-transparent hover:border-slate-400 hover:bg-slate-50/50 z-10'
                     }`}
                   >
-                    {/* Position Badge when selected or dragging */}
+                    {/* Position Badge when selected or dragging (Never clipped by top edge) */}
                     {isSelected && (
                       <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-mono px-2 py-0.5 rounded-full shadow flex items-center gap-1 pointer-events-none whitespace-nowrap z-30">
                         <Move className="w-2.5 h-2.5" />
@@ -828,6 +879,15 @@ export default function App() {
                         <QrCode className="w-6 h-6 mb-0.5 text-indigo-300" />
                         <span>[QR Code]</span>
                       </div>
+                    )}
+
+                    {el.type === 'image' && (
+                      <img 
+                        src={el.url} 
+                        alt="Uploaded Graphic" 
+                        style={{ width: `${(el.width || 60) * 0.8}px`, height: `${(el.height || 60) * 0.8}px`, objectFit: 'contain' }}
+                        className="pointer-events-none rounded shadow-sm"
+                      />
                     )}
                   </div>
                 );
