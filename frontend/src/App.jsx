@@ -39,6 +39,7 @@ import {
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
 import QRCode from 'qrcode';
+import { MDI_OFFLINE } from './utils/mdiIcons';
 
 // Presets oriented in Landscape view (Width x Height) for optimal readable workspace
 const PRESETS = [
@@ -58,6 +59,49 @@ export default function App() {
   // Label Elements
   const [elements, setElements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+
+  // Undo / Redo History Stack
+  const [history, setHistory] = useState([[]]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const elementsRef = useRef(elements);
+
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
+  const pushHistory = (newElements) => {
+    const nextHistory = history.slice(0, historyIndex + 1);
+    nextHistory.push(newElements);
+    setHistory(nextHistory);
+    setHistoryIndex(nextHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIndex = historyIndex - 1;
+      setHistoryIndex(prevIndex);
+      setElements(history[prevIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      setHistoryIndex(nextIndex);
+      setElements(history[nextIndex]);
+    }
+  };
+
+  // Local Storage Auto-Save
+  useEffect(() => {
+    if (elements.length > 0) {
+      const state = {
+        preset: selectedPreset,
+        elements: elements
+      };
+      localStorage.setItem('nelko_studio_autosave', JSON.stringify(state));
+    }
+  }, [elements, selectedPreset]);
 
   // Cache for preloaded QR Code images (for real scannable rendering on screen and canvas)
   const [qrCache, setQrCache] = useState({});
@@ -86,6 +130,72 @@ export default function App() {
   // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
   const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
 
+  // MDI Icons Search State
+  const [iconSearch, setIconSearch] = useState('');
+  const [iconResults, setIconResults] = useState([]);
+  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
+
+  const handleSearchIcons = async (query) => {
+    setIconSearch(query);
+    if (!query) {
+      setIconResults([]);
+      return;
+    }
+    
+    // 1. Search local offline curated catalog first
+    const matches = [];
+    Object.entries(MDI_OFFLINE).forEach(([cat, icons]) => {
+      icons.forEach(ic => {
+        if (ic.name.toLowerCase().includes(query.toLowerCase())) {
+          matches.push({ ...ic, source: 'offline' });
+        }
+      });
+    });
+
+    setIconResults(matches);
+
+    // 2. Fetch online MDI catalog via Iconify if internet is present
+    if (navigator.onLine) {
+      setIsSearchingIcons(true);
+      try {
+        const res = await fetch(`https://api.iconify.design/search?query=${encodeURIComponent(query)}&prefix=mdi`);
+        const data = await res.json();
+        if (data.icons && data.icons.length > 0) {
+          const webMatches = [];
+          for (let i = 0; i < Math.min(data.icons.length, 12); i++) {
+            const fullName = data.icons[i];
+            const cleanName = fullName.replace('mdi:', '');
+            // Prevent duplicates
+            if (!matches.some(m => m.name === cleanName)) {
+              webMatches.push({ name: cleanName, source: 'online' });
+            }
+          }
+          setIconResults(prev => [...prev, ...webMatches]);
+        }
+      } catch (err) {
+        console.warn("Iconify lookup failed:", err);
+      } finally {
+        setIsSearchingIcons(false);
+      }
+    }
+  };
+
+  const handleSelectWebIcon = async (iconName) => {
+    try {
+      const res = await fetch(`https://api.iconify.design/mdi/${iconName}.svg`);
+      const svgText = await res.text();
+      // Extract path element regex
+      const pathMatch = svgText.match(/d="([^"]+)"/);
+      if (pathMatch && pathMatch[1]) {
+        addIconElement(iconName, pathMatch[1]);
+      } else {
+        alert("Failed to extract vector path from icon.");
+      }
+    } catch (err) {
+      alert("Failed to load icon from server.");
+    }
+  };
+
   // Templates library & CSV Batch state
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
@@ -97,6 +207,7 @@ export default function App() {
   const [csvFilename, setCsvFilename] = useState('');
 
   const csvFileInputRef = useRef(null);
+  const layoutFileInputRef = useRef(null);
 
   // Helper: robust CSV string scanner
   const parseCSV = (text) => {
@@ -336,6 +447,21 @@ export default function App() {
       })
       .catch(() => {});
     fetchTemplates();
+
+    const saved = localStorage.getItem('nelko_studio_autosave');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.elements && parsed.preset) {
+          setElements(parsed.elements);
+          setSelectedPreset(parsed.preset);
+          setHistory([parsed.elements]);
+          setHistoryIndex(0);
+        }
+      } catch (e) {
+        console.error("Auto-save load failed:", e);
+      }
+    }
   }, []);
 
   // Connect Browser Bluetooth
@@ -454,6 +580,68 @@ export default function App() {
       img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const addIconElement = (name, path) => {
+    // Generate clean URL-encoded raw SVG string
+    const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"><path fill="#000000" d="${path}"/></svg>`;
+    const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
+    
+    const newEl = {
+      id: Date.now(),
+      type: 'image',
+      url: dataUrl,
+      x: 50,
+      y: 50,
+      width: 60,
+      height: 60,
+      iconName: name
+    };
+    
+    // Load as Image object for local offscreen canvas drawing
+    const img = new Image();
+    img.onload = () => {
+      newEl.imgObject = img;
+      pushHistory([...elements, newEl]);
+      setElements(prev => [...prev, newEl]);
+      setSelectedId(newEl.id);
+    };
+    img.src = dataUrl;
+  };
+
+  const handleExportLayout = () => {
+    const state = { preset: selectedPreset, elements };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `nelko-layout-${selectedPreset.name.replace(/\s+/g, '-')}-${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportLayout = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        if (parsed.elements && parsed.preset) {
+          pushHistory(parsed.elements);
+          setElements(parsed.elements);
+          setSelectedPreset(parsed.preset);
+          setSelectedTemplateId(null);
+          alert("Layout imported successfully!");
+        } else {
+          alert("Invalid design JSON file structure.");
+        }
+      } catch (err) {
+        alert("Failed to parse design file.");
+      }
+    };
+    reader.readAsText(file);
     e.target.value = '';
   };
 
@@ -926,6 +1114,29 @@ export default function App() {
               </select>
             </div>
           )}
+
+          {/* Import / Export Layout Action Buttons */}
+          <div className="flex gap-2 mt-2">
+            <button 
+              onClick={handleExportLayout}
+              className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+            >
+              Export Layout
+            </button>
+            <button 
+              onClick={() => layoutFileInputRef.current?.click()}
+              className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+            >
+              Import Layout
+            </button>
+            <input 
+              type="file" 
+              ref={layoutFileInputRef} 
+              onChange={handleImportLayout} 
+              accept=".json" 
+              className="hidden" 
+            />
+          </div>
         </div>
       )}
 
@@ -987,6 +1198,82 @@ export default function App() {
               accept="image/*" 
               className="hidden" 
             />
+          </div>
+        </div>
+      )}
+
+      {/* Icons Library Search Panel */}
+      {(!mobileTab || mobileTab === 'add') && (
+        <div className="mt-4">
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            Icons Library
+          </label>
+          <input 
+            type="text" 
+            placeholder="Search icons (e.g., home, star)..."
+            value={iconSearch}
+            onChange={(e) => handleSearchIcons(e.target.value)}
+            className="w-full p-2.5 mb-3 rounded-xl glass-input text-sm"
+          />
+          
+          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+            {iconSearch === '' ? (
+              // Default Offline Curated Icons Grid
+              Object.values(MDI_OFFLINE).flat().map((ic, i) => (
+                <button
+                  key={`offline-${i}`}
+                  onClick={() => addIconElement(ic.name, ic.path)}
+                  className="flex items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition"
+                  title={ic.name}
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
+                    <path d={ic.path} />
+                  </svg>
+                </button>
+              ))
+            ) : (
+              // Search Results
+              <>
+                {iconResults.map((ic, i) => (
+                  <button
+                    key={`res-${i}`}
+                    onClick={() => {
+                      if (ic.source === 'offline') {
+                        addIconElement(ic.name, ic.path);
+                      } else {
+                        handleSelectWebIcon(ic.name);
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition relative"
+                    title={ic.name}
+                  >
+                    {ic.source === 'offline' ? (
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
+                        <path d={ic.path} />
+                      </svg>
+                    ) : (
+                      <span className="text-xs font-medium text-indigo-300 truncate w-full text-center">
+                        {ic.name.substring(0, 8)}
+                      </span>
+                    )}
+                    {ic.source === 'online' && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500"></div>
+                    )}
+                  </button>
+                ))}
+                {isSearchingIcons && (
+                  <div className="col-span-4 py-4 flex justify-center">
+                    <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
+                  </div>
+                )}
+                {!isSearchingIcons && iconResults.length === 0 && (
+                  <div className="col-span-4 py-4 text-center text-xs text-slate-500">
+                    No icons found for "{iconSearch}"
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
