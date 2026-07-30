@@ -83,6 +83,76 @@ export default function App() {
   // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
   const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
 
+  // Templates library & CSV Batch state
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState([]);
+  const [csvRows, setCsvRows] = useState([]);
+  const [variableMapping, setVariableMapping] = useState({});
+  const [batchPreviewIndex, setBatchPreviewIndex] = useState(0);
+  const [csvFilename, setCsvFilename] = useState('');
+
+  const csvFileInputRef = useRef(null);
+
+  // Helper: robust CSV string scanner
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/);
+    if (lines.length === 0) return { headers: [], rows: [] };
+    
+    const parseLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const cleanLines = lines.map(line => line.trim()).filter(line => line.length > 0);
+    if (cleanLines.length === 0) return { headers: [], rows: [] };
+
+    const headers = parseLine(cleanLines[0]);
+    const rows = [];
+    for (let i = 1; i < cleanLines.length; i++) {
+      const values = parseLine(cleanLines[i]);
+      if (values.length >= headers.length) {
+        const row = {};
+        headers.forEach((h, index) => {
+          row[h] = values[index] || '';
+        });
+        rows.push(row);
+      }
+    }
+    return { headers, rows };
+  };
+
+  // Helper: scan elements for double curly braces template variables
+  const getTemplateVariables = () => {
+    const vars = new Set();
+    elements.forEach(el => {
+      if (el.type === 'text' || el.type === 'qr') {
+        const matches = (el.content || '').match(/\{\{([^}]+)\}\}/g);
+        if (matches) {
+          matches.forEach(m => {
+            vars.add(m.slice(2, -2).trim());
+          });
+        }
+      }
+    });
+    return Array.from(vars);
+  };
+
   // Dragging state & refs
   const containerRef = useRef(null);
   const [draggingId, setDraggingId] = useState(null);
@@ -224,7 +294,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedId]);
 
-  // Fetch status on load
+  // Fetch status and templates on load
+  const fetchTemplates = () => {
+    fetch('/api/templates')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setTemplates(data);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetch('/api/printer/status')
       .then(res => res.json())
@@ -233,6 +312,7 @@ export default function App() {
         if (data.config) setDriverConfig(data.config);
       })
       .catch(() => {});
+    fetchTemplates();
   }, []);
 
   // Connect Browser Bluetooth
@@ -373,6 +453,105 @@ export default function App() {
     return canvas;
   };
 
+  // Offscreen canvas builder helper for a specific job elements structure (e.g. batch)
+  const buildOffscreenCanvasForJob = (jobElements) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidthPx;
+    canvas.height = canvasHeightPx;
+    const ctx = canvas.getContext('2d');
+
+    // Fill White Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvasWidthPx, canvasHeightPx);
+
+    // Draw Elements
+    ctx.fillStyle = '#000000';
+    jobElements.forEach(el => {
+      const posX = (el.x / 100) * canvasWidthPx;
+      const posY = (el.y / 100) * canvasHeightPx;
+
+      if (el.type === 'text') {
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(el.content, posX, posY);
+      } else if (el.type === 'qr') {
+        const qrSize = (el.size || 60);
+        const cached = qrCache[el.content];
+        if (el.imgObject) {
+          ctx.drawImage(el.imgObject, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        } else if (cached && cached.img) {
+          ctx.drawImage(cached.img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        } else {
+          ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
+        }
+      } else if (el.type === 'image' && el.url) {
+        const img = el.imgObject || new Image();
+        if (!el.imgObject) img.src = el.url;
+        const imgW = (el.width || 60);
+        const imgH = (el.height || 60);
+        ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+      }
+    });
+
+    return canvas;
+  };
+
+  // Direct Bluetooth Sequential Batch Printer
+  const handlePrintBatchDirect = async (jobs) => {
+    setIsPrinting(true);
+    setPrintStatus(null);
+    try {
+      for (let i = 0; i < jobs.length; i++) {
+        const job = jobs[i];
+        // Substitute variables in elements
+        const jobElements = elements.map(el => {
+          let content = el.content || '';
+          if (el.type === 'text' || el.type === 'qr') {
+            Object.entries(job.variables).forEach(([k, v]) => {
+              content = content.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v);
+            });
+          }
+          return { ...el, content };
+        });
+
+        // Preload any QR codes for this job
+        for (let j = 0; j < jobElements.length; j++) {
+          const el = jobElements[j];
+          if (el.type === 'qr') {
+            const dataUrl = await QRCode.toDataURL(el.content, { margin: 1 });
+            const img = new Image();
+            await new Promise((resolve) => {
+              img.onload = resolve;
+              img.src = dataUrl;
+            });
+            el.imgObject = img;
+          }
+        }
+
+        const canvas = buildOffscreenCanvasForJob(jobElements);
+        const payloadBytes = convertCanvasToTsplBytes(canvas, activeWidthMm, activeHeightMm, selectedPreset.gap, density, job.copies, ditherMethod, invertColors);
+        
+        const success = await browserBtDriver.sendBytes(payloadBytes);
+        if (!success) {
+          throw new Error(`Failed to send job #${i + 1} in batch`);
+        }
+        setPrintStatus({ type: 'success', msg: `Printed label #${i + 1}/${jobs.length} in batch...` });
+        // Tiny pause between labels
+        await new Promise(r => setTimeout(r, 200));
+      }
+      setPrintStatus({ type: 'success', msg: `Successfully printed all ${jobs.length} labels in batch!` });
+    } catch (err) {
+      setPrintStatus({ type: 'error', msg: `Batch Print Error: ${err.message}` });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   // Generate Preview from API
   const handleGeneratePreview = async () => {
     setShowPreview(true);
@@ -495,35 +674,77 @@ export default function App() {
 
       {/* Preset Selection — show in desktop, or 'add' mobile tab */}
       {(!mobileTab || mobileTab === 'add') && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Grid className="w-3.5 h-3.5 text-indigo-400" />
-              Label Preset
-            </label>
-            <button 
-              onClick={() => setIsPortraitView(!isPortraitView)}
-              className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
-              title="Toggle Landscape / Portrait Editing View"
+        <div className="flex flex-col gap-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Grid className="w-3.5 h-3.5 text-indigo-400" />
+                Label Preset
+              </label>
+              <button 
+                onClick={() => setIsPortraitView(!isPortraitView)}
+                className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                title="Toggle Landscape / Portrait Editing View"
+              >
+                <RotateCw className="w-3 h-3" />
+                {isPortraitView ? 'Portrait' : 'Landscape'}
+              </button>
+            </div>
+            <select 
+              value={selectedPreset.name}
+              onChange={(e) => {
+                const preset = PRESETS.find(p => p.name === e.target.value);
+                if (preset) {
+                  setSelectedPreset(preset);
+                  setSelectedTemplateId(null); // Clear active template layout name
+                }
+              }}
+              className="w-full p-2.5 rounded-xl glass-input text-sm"
             >
-              <RotateCw className="w-3 h-3" />
-              {isPortraitView ? 'Portrait' : 'Landscape'}
-            </button>
+              {PRESETS.map(p => (
+                <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
-          <select 
-            value={selectedPreset.name}
-            onChange={(e) => {
-              const preset = PRESETS.find(p => p.name === e.target.value);
-              if (preset) setSelectedPreset(preset);
-            }}
-            className="w-full p-2.5 rounded-xl glass-input text-sm"
-          >
-            {PRESETS.map(p => (
-              <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
-                {p.name}
-              </option>
-            ))}
-          </select>
+
+          {/* Load templates dropdown */}
+          {templates.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                Load Template Layout
+              </label>
+              <select
+                value={selectedTemplateId || ''}
+                onChange={(e) => {
+                  const tid = e.target.value;
+                  if (!tid) {
+                    setSelectedTemplateId(null);
+                    setElements([]);
+                  } else {
+                    const temp = templates.find(t => t.id === tid);
+                    if (temp) {
+                      setElements(temp.data?.elements || temp.elements || []);
+                      const matchingPreset = PRESETS.find(p => p.width === temp.width_mm && p.height === temp.height_mm) 
+                        || { name: `${temp.width_mm}x${temp.height_mm} mm`, width: temp.width_mm, height: temp.height_mm, gap: temp.data?.gap_mm || 5 };
+                      setSelectedPreset(matchingPreset);
+                      setSelectedTemplateId(tid);
+                    }
+                  }
+                }}
+                className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-medium"
+              >
+                <option value="" className="bg-slate-900 text-slate-400">-- Start Blank / No Template --</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
+                    {t.name} ({t.width_mm}x{t.height_mm}mm)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -912,8 +1133,23 @@ export default function App() {
                 Invert Colors (White-on-Black)
               </label>
             </div>
+
+            <button
+              onClick={() => {
+                if (elements.length === 0) {
+                  alert("Canvas is empty. Add elements first or load a template.");
+                  return;
+                }
+                setShowBatchModal(true);
+              }}
+              className="mt-2 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 text-xs font-semibold transition"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Batch Print from CSV...
+            </button>
           </div>
         </aside>
+
 
         {/* Center Canvas Studio (Wide Landscape Workspace) */}
         <main className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-center relative overflow-auto pb-20 md:pb-0">
@@ -1488,6 +1724,231 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* CSV Batch Print Modal */}
+      {showBatchModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-xl glass-panel rounded-2xl p-6 border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] text-left select-text">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                CSV Batch Print Studio
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowBatchModal(false);
+                  setCsvRows([]);
+                  setCsvHeaders([]);
+                  setCsvFilename('');
+                }}
+                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4 text-sm text-slate-300">
+              {csvRows.length === 0 ? (
+                <div 
+                  onClick={() => csvFileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-800 hover:border-indigo-500 bg-slate-900/40 p-8 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-3 group"
+                >
+                  <Upload className="w-8 h-8 text-slate-500 group-hover:text-indigo-400 transition" />
+                  <div>
+                    <p className="font-semibold text-white">Upload CSV File</p>
+                    <p className="text-xs text-slate-500 mt-1">Select or drag a CSV file containing label rows</p>
+                  </div>
+                  <input
+                    type="file"
+                    ref={csvFileInputRef}
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        const { headers, rows } = parseCSV(evt.target.result);
+                        if (headers.length === 0 || rows.length === 0) {
+                          alert("Invalid or empty CSV file.");
+                          return;
+                        }
+                        setCsvHeaders(headers);
+                        setCsvRows(rows);
+                        setCsvFilename(file.name);
+                        
+                        // Auto-map matching variable names
+                        const templateVars = getTemplateVariables();
+                        const initialMapping = {};
+                        templateVars.forEach(v => {
+                          const match = headers.find(h => h.toLowerCase() === v.toLowerCase());
+                          if (match) initialMapping[v] = match;
+                        });
+                        setVariableMapping(initialMapping);
+                        setBatchPreviewIndex(0);
+                      };
+                      reader.readAsText(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-4">
+                  <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                    <div>
+                      <p className="text-xs text-slate-400">Active CSV File</p>
+                      <p className="text-sm font-semibold text-indigo-300">{csvFilename}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCsvRows([]);
+                        setCsvHeaders([]);
+                        setCsvFilename('');
+                      }}
+                      className="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-1 rounded hover:bg-rose-500/10 transition"
+                    >
+                      Clear File
+                    </button>
+                  </div>
+
+                  {/* Mapping variables */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
+                      Map Template Placeholders to CSV Columns
+                    </h4>
+                    {getTemplateVariables().length === 0 ? (
+                      <div className="text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg">
+                        ⚠️ No variables like <code>{"{{variable}}"}</code> found in current label elements. Add text/QR codes containing double curly braces to map CSV fields.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {getTemplateVariables().map(v => (
+                          <div key={v} className="grid grid-cols-3 items-center gap-3">
+                            <span className="text-xs font-mono text-indigo-300">{"{{"}{v}{"}}"}</span>
+                            <span className="text-center text-xs text-slate-500">maps to</span>
+                            <select
+                              value={variableMapping[v] || ''}
+                              onChange={(e) => setVariableMapping({ ...variableMapping, [v]: e.target.value })}
+                              className="p-2 rounded-lg glass-input text-xs"
+                            >
+                              <option value="">-- Ignore / Clear --</option>
+                              {csvHeaders.map(h => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Batch Preview Slider */}
+                  {csvRows.length > 0 && (
+                    <div className="border-t border-slate-800/80 pt-3.5 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Label Preview (Row {batchPreviewIndex + 1} of {csvRows.length})
+                        </h4>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={batchPreviewIndex === 0}
+                            onClick={() => setBatchPreviewIndex(prev => prev - 1)}
+                            className="p-1 px-2.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-xs transition"
+                          >
+                            ◀ Prev
+                          </button>
+                          <button
+                            disabled={batchPreviewIndex === csvRows.length - 1}
+                            onClick={() => setBatchPreviewIndex(prev => prev + 1)}
+                            className="p-1 px-2.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-xs transition"
+                          >
+                            Next ▶
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Display rendered variables for preview */}
+                      <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs space-y-1.5 font-mono">
+                        {getTemplateVariables().map(v => {
+                          const col = variableMapping[v];
+                          const val = col ? csvRows[batchPreviewIndex]?.[col] : `{{${v}}}`;
+                          return (
+                            <div key={v} className="flex justify-between border-b border-slate-905 pb-1">
+                              <span className="text-slate-500">{"{{"}{v}{"}}"}</span>
+                              <span className="text-indigo-400 font-semibold truncate max-w-[250px]">{val}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
+              <button 
+                onClick={() => {
+                  setShowBatchModal(false);
+                  setCsvRows([]);
+                  setCsvHeaders([]);
+                  setCsvFilename('');
+                }}
+                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-sm"
+              >
+                Close
+              </button>
+              {csvRows.length > 0 && (
+                <button 
+                  onClick={async () => {
+                    const jobs = csvRows.map(row => {
+                      const variables = {};
+                      Object.entries(variableMapping).forEach(([k, col]) => {
+                        variables[k] = row[col] || '';
+                      });
+                      return { variables, copies: 1 };
+                    });
+
+                    setShowBatchModal(false);
+
+                    if (useBrowserBt) {
+                      await handlePrintBatchDirect(jobs);
+                    } else {
+                      setIsPrinting(true);
+                      setPrintStatus(null);
+                      try {
+                        const res = await fetch('/api/print/batch', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            template_id: selectedTemplateId || 'custom_batch_temp',
+                            jobs: jobs,
+                            density: density,
+                            dither_method: ditherMethod
+                          })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setPrintStatus({ type: 'success', msg: `Batch of ${jobs.length} labels printed successfully via bridge!` });
+                        } else {
+                          setPrintStatus({ type: 'error', msg: data.detail || 'Batch print failed' });
+                        }
+                      } catch (err) {
+                        setPrintStatus({ type: 'error', msg: `Bridge Batch Error: ${err.message}` });
+                      } finally {
+                        setIsPrinting(false);
+                      }
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Batch ({csvRows.length} labels)
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
