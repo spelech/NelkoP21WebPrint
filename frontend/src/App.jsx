@@ -2248,7 +2248,8 @@ export default function App() {
                         position: 'absolute',
                         left: `${el.x}%`,
                         top: `${el.y}%`,
-                        transform: 'translate(-50%, -50%)'
+                        transform: 'translate(-50%, -50%)',
+                        maxWidth: 'none'
                       }}
                       className="p-1.5 whitespace-nowrap text-slate-900"
                     >
@@ -2348,7 +2349,8 @@ export default function App() {
                           left: `${el.x}%`,
                           top: `${el.y}%`,
                           transform: 'translate(-50%, -50%)',
-                          cursor: isBeingDragged ? 'grabbing' : 'grab'
+                          cursor: isBeingDragged ? 'grabbing' : 'grab',
+                          maxWidth: 'none'
                         }}
                         className={`p-1.5 rounded border-2 group whitespace-nowrap ${
                           isSelected 
