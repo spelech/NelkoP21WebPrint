@@ -31,7 +31,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Image as ImageIcon,
-  Upload
+  Upload,
+  Barcode,
+  Minus,
+  Square
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
@@ -264,9 +267,21 @@ export default function App() {
     };
   }, [draggingId]);
 
-  // Keyboard shortcut listener for moving elements with arrow keys
+  // Keyboard shortcut listener for editor actions
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
       if (!selectedId) return;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
@@ -274,16 +289,24 @@ export default function App() {
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, x: Math.max(0, Math.round((el.x - step) * 10) / 10) } : el));
+        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, x: Math.max(0, Math.round((el.x - step) * 10) / 10) } : el);
+        pushHistory(next);
+        setElements(next);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, x: Math.min(100, Math.round((el.x + step) * 10) / 10) } : el));
+        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, x: Math.min(100, Math.round((el.x + step) * 10) / 10) } : el);
+        pushHistory(next);
+        setElements(next);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, y: Math.max(0, Math.round((el.y - step) * 10) / 10) } : el));
+        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, y: Math.max(0, Math.round((el.y - step) * 10) / 10) } : el);
+        pushHistory(next);
+        setElements(next);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setElements(prev => prev.map(el => el.id === selectedId ? { ...el, y: Math.min(100, Math.round((el.y + step) * 10) / 10) } : el));
+        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, y: Math.min(100, Math.round((el.y + step) * 10) / 10) } : el);
+        pushHistory(next);
+        setElements(next);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         deleteSelectedElement();
@@ -292,7 +315,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId]);
+  }, [selectedId, historyIndex]);
 
   // Fetch status and templates on load
   const fetchTemplates = () => {
@@ -339,11 +362,9 @@ export default function App() {
       fontSize: 16,
       fontStyle: 'normal',
       x: 50,
-      y: 50,
-      width: 160,
-      height: 25,
-      align: 'center'
+      y: 50
     };
+    pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
   };
@@ -359,6 +380,52 @@ export default function App() {
       y: 50,
       size: 60
     };
+    pushHistory([...elements, newEl]);
+    setElements([...elements, newEl]);
+    setSelectedId(newEl.id);
+  };
+
+  const addBarcodeElement = () => {
+    const newEl = {
+      id: Date.now(),
+      type: 'barcode',
+      content: '12345678',
+      barcodeType: 'code128',
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 30
+    };
+    pushHistory([...elements, newEl]);
+    setElements([...elements, newEl]);
+    setSelectedId(newEl.id);
+  };
+
+  const addLineElement = () => {
+    const newEl = {
+      id: Date.now(),
+      type: 'line',
+      x: 50,
+      y: 50,
+      width: 120,
+      height: 4
+    };
+    pushHistory([...elements, newEl]);
+    setElements([...elements, newEl]);
+    setSelectedId(newEl.id);
+  };
+
+  const addRectangleElement = () => {
+    const newEl = {
+      id: Date.now(),
+      type: 'rectangle',
+      x: 50,
+      y: 50,
+      width: 160,
+      height: 60,
+      thickness: 2
+    };
+    pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
   };
@@ -380,6 +447,7 @@ export default function App() {
           height: 60,
           imgObject: img
         };
+        pushHistory([...elements, newEl]);
         setElements(prev => [...prev, newEl]);
         setSelectedId(newEl.id);
       };
@@ -397,13 +465,89 @@ export default function App() {
     if (!selectedElement) return;
     const newX = Math.max(0, Math.min(100, Math.round((selectedElement.x + dx) * 10) / 10));
     const newY = Math.max(0, Math.min(100, Math.round((selectedElement.y + dy) * 10) / 10));
-    updateSelectedElement('x', newX);
-    updateSelectedElement('y', newY);
+    const newElements = elements.map(el => el.id === selectedId ? { ...el, x: newX, y: newY } : el);
+    pushHistory(newElements);
+    setElements(newElements);
   };
 
   const deleteSelectedElement = () => {
-    setElements(elements.filter(el => el.id !== selectedId));
-    setSelectedId(elements.length > 1 ? elements[0].id : null);
+    const newElements = elements.filter(el => el.id !== selectedId);
+    pushHistory(newElements);
+    setElements(newElements);
+    setSelectedId(newElements.length > 0 ? newElements[0].id : null);
+  };
+
+  const sendToBack = () => {
+    if (!selectedId) return;
+    const item = elements.find(el => el.id === selectedId);
+    if (!item) return;
+    const remaining = elements.filter(el => el.id !== selectedId);
+    const newElements = [item, ...remaining];
+    pushHistory(newElements);
+    setElements(newElements);
+  };
+
+  const bringToFront = () => {
+    if (!selectedId) return;
+    const item = elements.find(el => el.id === selectedId);
+    if (!item) return;
+    const remaining = elements.filter(el => el.id !== selectedId);
+    const newElements = [...remaining, item];
+    pushHistory(newElements);
+    setElements(newElements);
+  };
+
+
+  // Simple Code128 (Type B) encoder and canvas drawer helper
+  const drawCode128OnCanvas = (ctx, text, x, y, width, height) => {
+    const patterns = [
+      "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
+      "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
+      "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
+      "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
+      "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
+      "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111",
+      "314111", "221411", "431111", "111224", "111422", "112214", "112412", "114212", "114411", "121124",
+      "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211",
+      "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211",
+      "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113",
+      "114311", "411113", "411311", "113141", "114131", "311141", "411131"
+    ];
+    
+    const startPattern = "211214";
+    const stopPattern = "2331112";
+    
+    let checksum = 104;
+    let encodedModules = startPattern;
+    
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i) - 32;
+      if (code >= 0 && code <= 95) {
+        encodedModules += patterns[code];
+        checksum += code * (i + 1);
+      }
+    }
+    
+    const checkDigit = checksum % 103;
+    encodedModules += patterns[checkDigit];
+    encodedModules += stopPattern;
+    
+    const totalModules = encodedModules.split('').reduce((sum, char) => sum + parseInt(char), 0);
+    const moduleW = width / totalModules;
+    
+    ctx.fillStyle = "#000000";
+    let curX = x - width / 2;
+    
+    for (let i = 0; i < encodedModules.length; i++) {
+      const val = parseInt(encodedModules[i]);
+      const isBar = (i % 2 === 0);
+      const drawW = val * moduleW;
+      
+      if (isBar) {
+        ctx.fillRect(curX, y - height / 2, drawW, height);
+      }
+      curX += drawW;
+    }
   };
 
   // Offscreen canvas builder helper for preview & print rasterization
@@ -434,19 +578,34 @@ export default function App() {
         if (cached && cached.img) {
           ctx.drawImage(cached.img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
         } else {
-          // Fallback: draw mock nested squares until loaded
           ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
           ctx.fillStyle = '#000000';
           ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
         }
+      } else if (el.type === 'barcode') {
+        const bcW = (el.width || 100);
+        const bcH = (el.height || 30);
+        drawCode128OnCanvas(ctx, el.content || '12345678', posX, posY, bcW, bcH);
       } else if (el.type === 'image' && el.url) {
         const img = el.imgObject || new Image();
         if (!el.imgObject) img.src = el.url;
         const imgW = (el.width || 60);
         const imgH = (el.height || 60);
         ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+      } else if (el.type === 'line') {
+        const lineW = (el.width || 120);
+        const lineH = (el.height || 4);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(posX - lineW / 2, posY - lineH / 2, lineW, lineH);
+      } else if (el.type === 'rectangle') {
+        const rectW = (el.width || 160);
+        const rectH = (el.height || 60);
+        const thickness = (el.thickness || 2);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = thickness;
+        ctx.strokeRect(posX - rectW / 2, posY - rectH / 2, rectW, rectH);
       }
     });
 
@@ -489,17 +648,34 @@ export default function App() {
           ctx.fillStyle = '#000000';
           ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
         }
+      } else if (el.type === 'barcode') {
+        const bcW = (el.width || 100);
+        const bcH = (el.height || 30);
+        drawCode128OnCanvas(ctx, el.content || '12345678', posX, posY, bcW, bcH);
       } else if (el.type === 'image' && el.url) {
         const img = el.imgObject || new Image();
         if (!el.imgObject) img.src = el.url;
         const imgW = (el.width || 60);
         const imgH = (el.height || 60);
         ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+      } else if (el.type === 'line') {
+        const lineW = (el.width || 120);
+        const lineH = (el.height || 4);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(posX - lineW / 2, posY - lineH / 2, lineW, lineH);
+      } else if (el.type === 'rectangle') {
+        const rectW = (el.width || 160);
+        const rectH = (el.height || 60);
+        const thickness = (el.thickness || 2);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = thickness;
+        ctx.strokeRect(posX - rectW / 2, posY - rectH / 2, rectW, rectH);
       }
     });
 
     return canvas;
   };
+
 
   // Direct Bluetooth Sequential Batch Printer
   const handlePrintBatchDirect = async (jobs) => {
@@ -723,14 +899,19 @@ export default function App() {
                   if (!tid) {
                     setSelectedTemplateId(null);
                     setElements([]);
+                    setHistory([[]]);
+                    setHistoryIndex(0);
                   } else {
                     const temp = templates.find(t => t.id === tid);
                     if (temp) {
-                      setElements(temp.data?.elements || temp.elements || []);
+                      const initialElements = temp.data?.elements || temp.elements || [];
+                      setElements(initialElements);
                       const matchingPreset = PRESETS.find(p => p.width === temp.width_mm && p.height === temp.height_mm) 
                         || { name: `${temp.width_mm}x${temp.height_mm} mm`, width: temp.width_mm, height: temp.height_mm, gap: temp.data?.gap_mm || 5 };
                       setSelectedPreset(matchingPreset);
                       setSelectedTemplateId(tid);
+                      setHistory([initialElements]);
+                      setHistoryIndex(0);
                     }
                   }
                 }}
@@ -758,21 +939,42 @@ export default function App() {
           <div className="grid grid-cols-3 gap-2">
             <button 
               onClick={addTextElement}
-              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
             >
               <Type className="w-4 h-4 text-indigo-400" />
               Text
             </button>
             <button 
               onClick={addQRElement}
-              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
             >
               <QrCode className="w-4 h-4 text-violet-400" />
               QR
             </button>
             <button 
+              onClick={addBarcodeElement}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+            >
+              <Barcode className="w-4 h-4 text-indigo-400" />
+              Barcode
+            </button>
+            <button 
+              onClick={addLineElement}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+            >
+              <Minus className="w-4 h-4 text-amber-400" />
+              Line
+            </button>
+            <button 
+              onClick={addRectangleElement}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+            >
+              <Square className="w-4 h-4 text-sky-400" />
+              Border
+            </button>
+            <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-1.5 p-3 rounded-xl glass-input hover:bg-slate-800 text-xs font-medium transition"
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
               title="Upload Graphic / Logo / Image"
             >
               <ImageIcon className="w-4 h-4 text-emerald-400" />
@@ -814,6 +1016,26 @@ export default function App() {
 
         {/* Action Controls — compact on mobile */}
         <div className="flex items-center gap-2">
+          {/* Undo / Redo controls */}
+          <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-805 p-1 rounded-xl mr-1">
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex === 0}
+              className="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold"
+              title="Undo (Ctrl+Z)"
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex === history.length - 1}
+              className="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold"
+              title="Redo (Ctrl+Y)"
+            >
+              Redo
+            </button>
+          </div>
+
           {/* Connection button hidden on mobile (accessible via Print tab) */}
           <div className="hidden md:flex items-center gap-3">
             {useBrowserBt ? (
@@ -887,112 +1109,168 @@ export default function App() {
                 </button>
               </div>
 
-              {selectedElement.type !== 'image' && (
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">
-                    {selectedElement.type === 'qr' ? 'QR Code Text / URL' : 'Text Content'}
-                  </label>
-                  <input 
-                    type="text" 
-                    value={selectedElement.content || ''}
-                    onChange={(e) => updateSelectedElement('content', e.target.value)}
-                    className="w-full p-2.5 rounded-xl glass-input text-sm"
-                  />
-                </div>
-              )}
+            {/* Text, QR, Barcode content input */}
+            {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">
+                  {selectedElement.type === 'qr' ? 'QR Code Text / URL' : selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
+                </label>
+                <input 
+                  type="text" 
+                  value={selectedElement.content || ''}
+                  onChange={(e) => updateSelectedElement('content', e.target.value)}
+                  onBlur={() => pushHistory(elementsRef.current)}
+                  className="w-full p-2.5 rounded-xl glass-input text-sm"
+                />
+              </div>
+            )}
 
-              {selectedElement.type === 'text' && (
+            {/* Barcode Type selection */}
+            {selectedElement.type === 'barcode' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Barcode Encoding</label>
+                <select
+                  value={selectedElement.barcodeType || 'code128'}
+                  onChange={(e) => {
+                    updateSelectedElement('barcodeType', e.target.value);
+                    pushHistory(elementsRef.current);
+                  }}
+                  className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
+                >
+                  <option value="code128" className="bg-slate-900 text-slate-100">Code 128 (Standard)</option>
+                  <option value="ean13" className="bg-slate-900 text-slate-100">EAN 13 (Retail Product)</option>
+                  <option value="ean8" className="bg-slate-900 text-slate-100">EAN 8 (Mini Retail)</option>
+                </select>
+              </div>
+            )}
+
+            {selectedElement.type === 'text' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
+                <input 
+                  type="range" 
+                  min="8" 
+                  max="64" 
+                  value={selectedElement.fontSize || 22}
+                  onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
+                  onMouseUp={() => pushHistory(elementsRef.current)}
+                  onTouchEnd={() => pushHistory(elementsRef.current)}
+                  className="w-full accent-indigo-500"
+                />
+              </div>
+            )}
+
+            {selectedElement.type === 'qr' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
+                <input 
+                  type="range" 
+                  min="20" 
+                  max="180" 
+                  value={selectedElement.size || 60}
+                  onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
+                  onMouseUp={() => pushHistory(elementsRef.current)}
+                  onTouchEnd={() => pushHistory(elementsRef.current)}
+                  className="w-full accent-indigo-500"
+                />
+              </div>
+            )}
+
+            {(selectedElement.type === 'image' || selectedElement.type === 'barcode' || selectedElement.type === 'line' || selectedElement.type === 'rectangle') && (
+              <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs text-slate-400">
+                      {selectedElement.type === 'line' ? 'Line Length' : 'Width'}
+                    </label>
+                    <span className="text-xs font-mono text-indigo-300">{selectedElement.width || 60}px</span>
+                  </div>
                   <input 
                     type="range" 
-                    min="8" 
-                    max="64" 
-                    value={selectedElement.fontSize || 22}
-                    onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
+                    min="5" 
+                    max="320" 
+                    value={selectedElement.width || 60}
+                    onChange={(e) => {
+                      const newW = parseInt(e.target.value);
+                      const ratio = (selectedElement.height || 60) / (selectedElement.width || 60);
+                      if (selectedElement.type === 'image' && selectedElement.keepRatio !== false && ratio) {
+                        setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, width: newW, height: Math.round(newW * ratio) } : el));
+                      } else {
+                        updateSelectedElement('width', newW);
+                      }
+                    }}
+                    onMouseUp={() => pushHistory(elementsRef.current)}
+                    onTouchEnd={() => pushHistory(elementsRef.current)}
                     className="w-full accent-indigo-500"
                   />
                 </div>
-              )}
-
-              {selectedElement.type === 'qr' && (
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs text-slate-400">
+                      {selectedElement.type === 'line' ? 'Line Thickness' : 'Height'}
+                    </label>
+                    <span className="text-xs font-mono text-indigo-300">{selectedElement.height || (selectedElement.type === 'line' ? 4 : 60)}px</span>
+                  </div>
                   <input 
                     type="range" 
-                    min="20" 
-                    max="180" 
-                    value={selectedElement.size || 60}
-                    onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
+                    min={selectedElement.type === 'line' ? 1 : 5} 
+                    max={selectedElement.type === 'line' ? 24 : 150} 
+                    value={selectedElement.height || (selectedElement.type === 'line' ? 4 : 60)}
+                    onChange={(e) => {
+                      const newH = parseInt(e.target.value);
+                      const ratio = (selectedElement.width || 60) / (selectedElement.height || 60);
+                      if (selectedElement.type === 'image' && selectedElement.keepRatio !== false && ratio) {
+                        setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, height: newH, width: Math.round(newH * ratio) } : el));
+                      } else {
+                        updateSelectedElement('height', newH);
+                      }
+                    }}
+                    onMouseUp={() => pushHistory(elementsRef.current)}
+                    onTouchEnd={() => pushHistory(elementsRef.current)}
                     className="w-full accent-indigo-500"
                   />
                 </div>
-              )}
-
-              {selectedElement.type === 'image' && (
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-400">Image Width</label>
-                      <span className="text-xs font-mono text-indigo-300">{selectedElement.width || 60}px</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="300" 
-                      value={selectedElement.width || 60}
-                      onChange={(e) => {
-                        const newW = parseInt(e.target.value);
-                        const ratio = (selectedElement.height || 60) / (selectedElement.width || 60);
-                        if (selectedElement.keepRatio !== false && ratio) {
-                          setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, width: newW, height: Math.round(newW * ratio) } : el));
-                        } else {
-                          updateSelectedElement('width', newW);
-                        }
-                      }}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-400">Image Height</label>
-                      <span className="text-xs font-mono text-indigo-300">{selectedElement.height || 60}px</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="300" 
-                      value={selectedElement.height || 60}
-                      onChange={(e) => {
-                        const newH = parseInt(e.target.value);
-                        const ratio = (selectedElement.width || 60) / (selectedElement.height || 60);
-                        if (selectedElement.keepRatio !== false && ratio) {
-                          setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, height: newH, width: Math.round(newH * ratio) } : el));
-                        } else {
-                          updateSelectedElement('height', newH);
-                        }
-                      }}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
+                {selectedElement.type === 'image' && (
                   <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pt-1">
                     <input 
                       type="checkbox"
                       checked={selectedElement.keepRatio !== false}
-                      onChange={(e) => updateSelectedElement('keepRatio', e.target.checked)}
+                      onChange={(e) => {
+                        updateSelectedElement('keepRatio', e.target.checked);
+                        pushHistory(elementsRef.current);
+                      }}
                       className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
                     />
                     Lock Aspect Ratio
                   </label>
-                </div>
-              )}
+                )}
+                {selectedElement.type === 'rectangle' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-400">Border Thickness</label>
+                      <span className="text-xs font-mono text-indigo-300">{selectedElement.thickness || 2}px</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="12" 
+                      value={selectedElement.thickness || 2}
+                      onChange={(e) => updateSelectedElement('thickness', parseInt(e.target.value))}
+                      onMouseUp={() => pushHistory(elementsRef.current)}
+                      onTouchEnd={() => pushHistory(elementsRef.current)}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* Position & Alignment Controls */}
-              <div className="border-t border-slate-800/60 pt-3 flex flex-col gap-3">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Move className="w-3.5 h-3.5 text-indigo-400" />
-                  Position & Alignment
-                </span>
+            {/* Position & Alignment Controls */}
+            <div className="border-t border-slate-800/60 pt-3 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Move className="w-3.5 h-3.5 text-indigo-400" />
+                Position & Alignment
+              </span>
 
                 {/* Numerical Sliders */}
                 <div className="grid grid-cols-2 gap-3">
@@ -1007,6 +1285,8 @@ export default function App() {
                       max="100" 
                       value={selectedElement.x}
                       onChange={(e) => updateSelectedElement('x', parseFloat(e.target.value))}
+                      onMouseUp={() => pushHistory(elementsRef.current)}
+                      onTouchEnd={() => pushHistory(elementsRef.current)}
                       className="w-full accent-indigo-500"
                     />
                   </div>
@@ -1022,6 +1302,8 @@ export default function App() {
                       max="100" 
                       value={selectedElement.y}
                       onChange={(e) => updateSelectedElement('y', parseFloat(e.target.value))}
+                      onMouseUp={() => pushHistory(elementsRef.current)}
+                      onTouchEnd={() => pushHistory(elementsRef.current)}
                       className="w-full accent-indigo-500"
                     />
                   </div>
@@ -1030,23 +1312,33 @@ export default function App() {
                 {/* Quick Align & Nudge */}
                 <div className="flex flex-col gap-2">
                   <label className="text-xs text-slate-400">Quick Align & Nudge</label>
-                  <div className="flex items-center justify-between gap-2">
-                    <button 
-                      onClick={() => updateSelectedElement('x', 50)}
-                      className="px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition flex items-center gap-1"
-                      title="Center Horizontally"
-                    >
-                      <AlignCenter className="w-3.5 h-3.5 text-indigo-400" />
-                      Center X
-                    </button>
-                    <button 
-                      onClick={() => updateSelectedElement('y', 50)}
-                      className="px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition flex items-center gap-1"
-                      title="Center Vertically"
-                    >
-                      <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" />
-                      Center Y
-                    </button>
+                  <div className="flex flex-col gap-2 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/60">
+                    <div className="flex items-center justify-between gap-2">
+                      <button 
+                        onClick={() => {
+                          const newElements = elements.map(el => el.id === selectedId ? { ...el, x: 50 } : el);
+                          pushHistory(newElements);
+                          setElements(newElements);
+                        }}
+                        className="flex-1 py-1.5 rounded-lg glass-input text-[11px] font-medium hover:border-indigo-500/50 transition flex items-center justify-center gap-1"
+                        title="Center Horizontally"
+                      >
+                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400" />
+                        Center X
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const newElements = elements.map(el => el.id === selectedId ? { ...el, y: 50 } : el);
+                          pushHistory(newElements);
+                          setElements(newElements);
+                        }}
+                        className="flex-1 py-1.5 rounded-lg glass-input text-[11px] font-medium hover:border-indigo-500/50 transition flex items-center justify-center gap-1"
+                        title="Center Vertically"
+                      >
+                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" />
+                        Center Y
+                      </button>
+                    </div>
 
                     {/* D-Pad Nudge Buttons */}
                     <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
@@ -1079,6 +1371,24 @@ export default function App() {
                         title="Nudge Right"
                       >
                         <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Layer arrangement buttons */}
+                    <div className="grid grid-cols-2 gap-2 mt-1.5 pt-2 border-t border-slate-800/80">
+                      <button 
+                        onClick={sendToBack}
+                        className="py-1 px-2 rounded bg-slate-800/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-400 hover:text-slate-200 transition"
+                        title="Send Element to Back (bottom layer)"
+                      >
+                        Send to Back
+                      </button>
+                      <button 
+                        onClick={bringToFront}
+                        className="py-1 px-2 rounded bg-slate-800/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-400 hover:text-slate-200 transition"
+                        title="Bring Element to Front (top layer)"
+                      >
+                        Bring to Front
                       </button>
                     </div>
                   </div>
@@ -1254,6 +1564,41 @@ export default function App() {
                           alt="Uploaded Graphic" 
                           style={{ width: `${el.width || 60}px`, height: `${el.height || 60}px`, objectFit: 'contain' }}
                           className="rounded shadow-sm"
+                        />
+                      )}
+
+                      {el.type === 'barcode' && (
+                        <div 
+                          style={{ width: `${el.width || 100}px`, height: `${el.height || 30}px` }} 
+                          className="bg-white border border-slate-200 flex flex-col items-center justify-between rounded p-1 shadow-inner relative overflow-hidden"
+                        >
+                          <div className="w-full flex-1 flex items-stretch justify-around px-2 opacity-80 pointer-events-none">
+                            {[1, 3, 1, 2, 4, 1, 2, 3, 1, 4, 2, 1, 3, 1, 2].map((w, idx) => (
+                              <div key={idx} className="bg-slate-900" style={{ width: `${w}px` }} />
+                            ))}
+                          </div>
+                          <span className="text-[7px] font-mono leading-none tracking-widest uppercase text-slate-700 truncate max-w-full px-1">{el.content}</span>
+                        </div>
+                      )}
+
+                      {el.type === 'line' && (
+                        <div 
+                          style={{ 
+                            width: `${el.width || 120}px`, 
+                            height: `${el.height || 4}px` 
+                          }} 
+                          className="bg-slate-900 rounded-full animate-pulse-subtle"
+                        />
+                      )}
+
+                      {el.type === 'rectangle' && (
+                        <div 
+                          style={{ 
+                            width: `${el.width || 160}px`, 
+                            height: `${el.height || 60}px`,
+                            border: `${el.thickness || 2}px solid #0f172a`
+                          }} 
+                          className="bg-transparent rounded-none"
                         />
                       )}
                     </div>
