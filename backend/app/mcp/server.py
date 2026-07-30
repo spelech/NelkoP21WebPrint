@@ -1,7 +1,7 @@
 from typing import Optional
 from fastmcp import FastMCP
 from app.core.config import settings
-from app.api.print_routes import render_simple_label_image, PrintTextRequest, get_driver
+from app.api.print_routes import render_simple_label_image, PrintTextRequest, get_driver, load_template_data, render_template_image
 from app.core.rasterizer import dither_image
 from app.core.tspl_builder import TSPLStreamBuilder
 
@@ -66,5 +66,112 @@ def list_label_presets() -> str:
         lines.append(f"- {p['name']}: {p['width']}mm x {p['height']}mm (Gap: {p['gap']}mm)")
     return "\n".join(lines)
 
+@mcp.tool()
+def list_templates() -> str:
+    """List available templates (saved label layouts) that can be printed."""
+    import os
+    from app.api.template_routes import TEMPLATES_DIR
+    lines = ["Available Templates:"]
+    for fname in os.listdir(TEMPLATES_DIR):
+        if fname.endswith(".json"):
+            tid = fname[:-5]
+            lines.append(f"- {tid}")
+    return "\n".join(lines)
+
+@mcp.tool()
+def print_template_label(
+    template_id: str,
+    variables_json: str,
+    copies: int = 1
+) -> str:
+    """
+    Print a label using a pre-saved layout template and variable replacement.
+    
+    Args:
+        template_id: The ID of the template to use (e.g. 'asset_tag').
+        variables_json: JSON string of variables to substitute, e.g. '{"name": "Server-01", "url": "http://10.0.0.10"}'
+        copies: Number of copies to print.
+    """
+    import json
+    try:
+        variables = json.loads(variables_json)
+    except Exception as e:
+        return f"Error: Invalid variables JSON: {e}"
+        
+    try:
+        template_data = load_template_data(template_id)
+        img = render_template_image(template_data, variables)
+        mono_img = dither_image(img)
+        
+        width_mm = template_data.get("width_mm", 40.0)
+        height_mm = template_data.get("height_mm", 14.0)
+        gap_mm = template_data.get("gap_mm", 5.0)
+        
+        builder = TSPLStreamBuilder(width_mm=width_mm, height_mm=height_mm, gap_mm=gap_mm)
+        builder.set_copies(copies)
+        payload = builder.build_from_image(mono_img)
+        
+        driver = get_driver()
+        success = driver.send_bytes(payload)
+        driver.disconnect()
+        
+        if success:
+            return f"Successfully printed template '{template_id}' with variables {variables} ({copies} copies)."
+        else:
+            return "Error: Failed to transmit payload to printer."
+    except Exception as e:
+        return f"Error: {e}"
+
+@mcp.tool()
+def print_batch_labels(
+    template_id: str,
+    jobs_json: str
+) -> str:
+    """
+    Print a batch of labels sequentially using a template and a list of job variables.
+    
+    Args:
+        template_id: The ID of the template to use (e.g. 'asset_tag').
+        jobs_json: JSON string of a list of job dicts, e.g. '[{"variables": {"name": "S1", "url": "U1"}, "copies": 1}, {"variables": {"name": "S2", "url": "U2"}}]'
+    """
+    import json
+    try:
+        jobs = json.loads(jobs_json)
+    except Exception as e:
+        return f"Error: Invalid jobs JSON: {e}"
+        
+    try:
+        template_data = load_template_data(template_id)
+        width_mm = template_data.get("width_mm", 40.0)
+        height_mm = template_data.get("height_mm", 14.0)
+        gap_mm = template_data.get("gap_mm", 5.0)
+        
+        driver = get_driver()
+        total_printed = 0
+        
+        for idx, job in enumerate(jobs):
+            variables = job.get("variables", {})
+            copies = job.get("copies", 1)
+            
+            img = render_template_image(template_data, variables)
+            mono_img = dither_image(img)
+            
+            builder = TSPLStreamBuilder(width_mm=width_mm, height_mm=height_mm, gap_mm=gap_mm)
+            builder.set_copies(copies)
+            payload = builder.build_from_image(mono_img)
+            
+            success = driver.send_bytes(payload)
+            if not success:
+                driver.disconnect()
+                return f"Error: Failed to print job #{idx + 1} in batch (printed {total_printed} total copies so far)."
+                
+            total_printed += copies
+            
+        driver.disconnect()
+        return f"Successfully printed batch of {len(jobs)} jobs (total {total_printed} copies) using template '{template_id}'."
+    except Exception as e:
+        return f"Error: {e}"
+
 if __name__ == "__main__":
     mcp.run()
+

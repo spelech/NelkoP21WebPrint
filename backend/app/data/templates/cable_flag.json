@@ -1,0 +1,26 @@
+{
+  "name": "Cable Wrap Flag",
+  "width_mm": 50.0,
+  "height_mm": 15.0,
+  "gap_mm": 5.0,
+  "elements": [
+    {
+      "id": 1,
+      "type": "text",
+      "content": "{{name}}",
+      "fontSize": 12,
+      "fontStyle": "bold",
+      "x": 25,
+      "y": 50
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "content": "{{name}}",
+      "fontSize": 12,
+      "fontStyle": "bold",
+      "x": 75,
+      "y": 50
+    }
+  ]
+}

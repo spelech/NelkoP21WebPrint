@@ -1,0 +1,26 @@
+{
+  "name": "Storage Box Label",
+  "width_mm": 40.0,
+  "height_mm": 12.0,
+  "gap_mm": 5.0,
+  "elements": [
+    {
+      "id": 1,
+      "type": "text",
+      "content": "{{title}}",
+      "fontSize": 16,
+      "fontStyle": "bold",
+      "x": 50,
+      "y": 35
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "content": "{{subtitle}}",
+      "fontSize": 10,
+      "fontStyle": "normal",
+      "x": 50,
+      "y": 75
+    }
+  ]
+}

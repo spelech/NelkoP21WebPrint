@@ -5,6 +5,10 @@ import os
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Enforce mock mode for unit tests
+os.environ["DEFAULT_DRIVER_TYPE"] = "mock"
+
+
 from PIL import Image
 from app.core.rasterizer import mm_to_dots, get_padded_dimensions, pack_bitmap_to_tspl_bytes, dither_image
 from app.core.tspl_builder import TSPLStreamBuilder
@@ -77,5 +81,67 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "image/png")
 
+class TestTemplatesAndBatch(unittest.TestCase):
+    def test_list_templates(self):
+        response = client.get("/api/templates")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(len(data) > 0)
+        # Verify default stock templates exist
+        stock_ids = [t["id"] for t in data]
+        self.assertIn("asset_tag", stock_ids)
+        self.assertIn("cable_flag", stock_ids)
+        self.assertIn("box_label", stock_ids)
+
+    def test_get_template(self):
+        response = client.get("/api/templates/asset_tag")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["name"], "Asset Tag (Standard)")
+        self.assertTrue(len(data["elements"]) > 0)
+
+    def test_post_preview_template(self):
+        payload = {
+            "template_id": "asset_tag",
+            "variables": {
+                "name": "TEST DEVICE",
+                "url": "https://test.wileyriley.com"
+            }
+        }
+        response = client.post("/api/preview/template", json=payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/png")
+
+    def test_post_print_template(self):
+        payload = {
+            "template_id": "box_label",
+            "variables": {
+                "title": "KITCHEN BOX",
+                "subtitle": "UTENSILS"
+            },
+            "copies": 1
+        }
+        # In mock mode, this will succeed with 200
+        response = client.post("/api/print/template", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+
+    def test_post_print_batch(self):
+        payload = {
+            "template_id": "asset_tag",
+            "jobs": [
+                { "variables": { "name": "DEV-01", "url": "http://1" }, "copies": 1 },
+                { "variables": { "name": "DEV-02", "url": "http://2" }, "copies": 2 }
+            ]
+        }
+        response = client.post("/api/print/batch", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["batch_size"], 2)
+        self.assertEqual(data["total_copies"], 3)
+
 if __name__ == "__main__":
     unittest.main()
+
