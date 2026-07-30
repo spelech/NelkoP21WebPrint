@@ -1,8 +1,18 @@
 import os
 from pydantic_settings import BaseSettings
 
+VERSION_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "..", "VERSION")
+default_version = "1.1.0"
+if os.path.exists(VERSION_FILE):
+    try:
+        with open(VERSION_FILE, "r") as f:
+            default_version = f.read().strip()
+    except Exception:
+        pass
+
 class Settings(BaseSettings):
     APP_NAME: str = "Nelko P21 Web Print"
+    VERSION: str = default_version
     DPI: int = 203  # 8 dots per mm
     DEFAULT_LABEL_WIDTH_MM: float = 14.0
     DEFAULT_LABEL_HEIGHT_MM: float = 40.0

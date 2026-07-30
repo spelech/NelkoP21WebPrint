@@ -12,7 +12,7 @@ from app.api.template_routes import router as template_router
 app = FastAPI(
     title=settings.APP_NAME,
     description="Web App, REST API & MCP Server for Nelko P21 Thermal Printers",
-    version="1.0.1"
+    version=settings.VERSION
 )
 
 # Enable CORS for local React dev server

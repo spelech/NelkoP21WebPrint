@@ -17,6 +17,7 @@ def get_printer_status():
     driver = get_driver()
     status_info = driver.get_status()
     return {
+        "version": settings.VERSION,
         "config": {
             "driver_type": settings.DEFAULT_DRIVER_TYPE,
             "tcp_host": settings.PRINTER_TCP_HOST,

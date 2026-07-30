@@ -63,6 +63,7 @@ export default function App() {
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   // Print & Driver State
+  const [appVersion, setAppVersion] = useState('1.1.0');
   const [useBrowserBt, setUseBrowserBt] = useState(true);
   const [browserBtConnected, setBrowserBtConnected] = useState(false);
   const [browserBtDeviceName, setBrowserBtDeviceName] = useState('');
@@ -200,6 +201,7 @@ export default function App() {
     fetch('/api/printer/status')
       .then(res => res.json())
       .then(data => {
+        if (data.version) setAppVersion(data.version);
         if (data.config) setDriverConfig(data.config);
       })
       .catch(() => {});
@@ -405,9 +407,14 @@ export default function App() {
             <Printer className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
-              Nelko P21 Studio
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
+                Nelko P21 Studio
+              </h1>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-mono font-semibold">
+                v{appVersion}
+              </span>
+            </div>
             <p className="text-xs text-slate-400">203 DPI Thermal Label Engine</p>
           </div>
         </div>
