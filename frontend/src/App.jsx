@@ -45,9 +45,12 @@ import { MDI_OFFLINE } from './utils/mdiIcons';
 const PRESETS = [
   { name: '40 x 14 mm (Standard Gap)', width: 40, height: 14, gap: 5 },
   { name: '40 x 12 mm White Gap', width: 40, height: 12, gap: 5 },
+  { name: '30 x 20 mm Small', width: 30, height: 20, gap: 5 },
+  { name: '30 x 15 mm Micro', width: 30, height: 15, gap: 5 },
   { name: '30 x 12 mm Compact', width: 30, height: 12, gap: 5 },
+  { name: '30 x 30 mm Square', width: 30, height: 30, gap: 5 },
   { name: '22 x 12 mm Mini', width: 22, height: 12, gap: 5 },
-  { name: '50 x 15 mm Cable Flag', width: 50, height: 15, gap: 5 },
+  { name: '50 x 15 mm Cable Flag Wrap', width: 50, height: 15, gap: 5 },
   { name: '60 x 12 mm Continuous Roll', width: 60, height: 12, gap: 0 },
 ];
 
@@ -60,6 +63,11 @@ export default function App() {
   const [elements, setElements] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
 
+  // Snap-to-Grid & Alignment Guides State
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [alignmentGuides, setAlignmentGuides] = useState([]);
+
   // Undo / Redo History Stack
   const [history, setHistory] = useState([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -68,6 +76,11 @@ export default function App() {
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  const snapToGridRef = useRef(snapToGrid);
+  useEffect(() => {
+    snapToGridRef.current = snapToGrid;
+  }, [snapToGrid]);
 
   const pushHistory = (newElements) => {
     const nextHistory = history.slice(0, historyIndex + 1);
@@ -287,6 +300,41 @@ export default function App() {
   const [ditherMethod, setDitherMethod] = useState('threshold');
   const [invertColors, setInvertColors] = useState(false);
   const [zoomScale, setZoomScale] = useState(1.5);
+  const [touchStartDist, setTouchStartDist] = useState(null);
+  const touchStartDistRef = useRef(null);
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setTouchStartDist(dist);
+      touchStartDistRef.current = dist;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && (touchStartDistRef.current || touchStartDist)) {
+      const currentDist = touchStartDistRef.current || touchStartDist;
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (currentDist > 0) {
+        const ratio = dist / currentDist;
+        setZoomScale(prev => Math.min(Math.max(prev * ratio, 0.5), 3.0));
+      }
+      setTouchStartDist(dist);
+      touchStartDistRef.current = dist;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchStartDist(null);
+    touchStartDistRef.current = null;
+  };
+
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
@@ -313,6 +361,13 @@ export default function App() {
   const dpi = 203;
   const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
   const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
+
+  const canvasWidthPxRef = useRef(canvasWidthPx);
+  const canvasHeightPxRef = useRef(canvasHeightPx);
+  useEffect(() => {
+    canvasWidthPxRef.current = canvasWidthPx;
+    canvasHeightPxRef.current = canvasHeightPx;
+  }, [canvasWidthPx, canvasHeightPx]);
 
   // Drag Event Handlers
   const handleStartDrag = (e, id) => {
@@ -342,6 +397,7 @@ export default function App() {
     if (draggingId === null) return;
 
     const handlePointerMove = (e) => {
+      if (e.touches && e.touches.length > 1) return;
       if (!containerRef.current) return;
 
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -354,15 +410,72 @@ export default function App() {
       let newX = cursorX - dragOffsetRef.current.x;
       let newY = cursorY - dragOffsetRef.current.y;
 
+      // Clamp raw drag target between 0 and 100%
+      newX = Math.max(0, Math.min(100, newX));
+      newY = Math.max(0, Math.min(100, newY));
+
+      let snappedX = false;
+      let snappedY = false;
+
+      // 1. Snap-to-grid math (8px increment conversion)
+      if (snapToGridRef.current && canvasWidthPxRef.current > 0 && canvasHeightPxRef.current > 0) {
+        const pxX = (newX / 100) * canvasWidthPxRef.current;
+        const pxY = (newY / 100) * canvasHeightPxRef.current;
+        const snappedPxX = Math.round(pxX / 8) * 8;
+        const snappedPxY = Math.round(pxY / 8) * 8;
+        newX = (snappedPxX / canvasWidthPxRef.current) * 100;
+        newY = (snappedPxY / canvasHeightPxRef.current) * 100;
+        snappedX = true;
+        snappedY = true;
+      }
+
+      // 2. Alignment guide detection with 1.5% threshold (Canvas center 50% and all other elements)
+      const threshold = 1.5;
+      const guides = [];
+      const otherElements = elementsRef.current.filter(el => el.id !== draggingId);
+
+      // Check vertical alignment (X position)
+      const xTargets = [50, ...otherElements.map(el => el.x)];
+      for (const targetX of xTargets) {
+        if (Math.abs(newX - targetX) <= threshold) {
+          newX = targetX;
+          guides.push({ type: 'vertical', x: targetX });
+          snappedX = true;
+          break;
+        }
+      }
+
+      // Check horizontal alignment (Y position)
+      const yTargets = [50, ...otherElements.map(el => el.y)];
+      for (const targetY of yTargets) {
+        if (Math.abs(newY - targetY) <= threshold) {
+          newY = targetY;
+          guides.push({ type: 'horizontal', y: targetY });
+          snappedY = true;
+          break;
+        }
+      }
+
+      // Default 1-decimal rounding if not snapped
+      if (!snappedX) {
+        newX = Math.round(newX * 10) / 10;
+      }
+      if (!snappedY) {
+        newY = Math.round(newY * 10) / 10;
+      }
+
       // Clamp between 0 and 100%
-      newX = Math.max(0, Math.min(100, Math.round(newX * 10) / 10));
-      newY = Math.max(0, Math.min(100, Math.round(newY * 10) / 10));
+      newX = Math.max(0, Math.min(100, newX));
+      newY = Math.max(0, Math.min(100, newY));
+
+      setAlignmentGuides(guides);
 
       setElements(prev => prev.map(el => el.id === draggingId ? { ...el, x: newX, y: newY } : el));
     };
 
     const handlePointerUp = () => {
       setDraggingId(null);
+      setAlignmentGuides([]);
     };
 
     window.addEventListener('mousemove', handlePointerMove);
@@ -487,6 +600,7 @@ export default function App() {
       content: 'New Text',
       fontSize: 16,
       fontStyle: 'normal',
+      fontFamily: 'sans-serif',
       x: 50,
       y: 50
     };
@@ -502,6 +616,8 @@ export default function App() {
       id: Date.now(),
       type: 'qr',
       content: 'P21-LABEL-123',
+      qrHelperType: 'text',
+      qrHelperFields: { plainText: 'P21-LABEL-123' },
       x: 50,
       y: 50,
       size: 60
@@ -649,6 +765,246 @@ export default function App() {
     setElements(elements.map(el => el.id === selectedId ? { ...el, [key]: val } : el));
   };
 
+  const updateQRHelper = (helperType, fieldUpdates) => {
+    if (!selectedElement || selectedElement.type !== 'qr') return;
+
+    const prevFields = selectedElement.qrHelperFields || {};
+    const updatedFields = { ...prevFields, ...fieldUpdates };
+
+    let compiledValue = selectedElement.content || '';
+
+    if (helperType === 'wifi') {
+      const ssid = updatedFields.wifiSsid || '';
+      const pass = updatedFields.wifiPassword || '';
+      const enc = updatedFields.wifiEncryption || 'WPA';
+      const authType = enc === 'None' ? 'nopass' : enc;
+      compiledValue = `WIFI:S:${ssid};T:${authType};P:${pass};;`;
+    } else if (helperType === 'vcard') {
+      const fn = updatedFields.vcardFirstName || '';
+      const ln = updatedFields.vcardLastName || '';
+      const phone = updatedFields.vcardPhone || '';
+      const email = updatedFields.vcardEmail || '';
+      const org = updatedFields.vcardOrg || '';
+      const fullName = `${fn} ${ln}`.trim();
+
+      const lines = ['BEGIN:VCARD', 'VERSION:3.0', `N:${ln};${fn};;;`, `FN:${fullName}`];
+      if (phone) lines.push(`TEL:${phone}`);
+      if (email) lines.push(`EMAIL:${email}`);
+      if (org) lines.push(`ORG:${org}`);
+      lines.push('END:VCARD');
+      compiledValue = lines.join('\n');
+    } else if (helperType === 'phone') {
+      const phone = updatedFields.phoneNum || '';
+      compiledValue = `tel:${phone}`;
+    } else if (helperType === 'text') {
+      compiledValue = updatedFields.plainText !== undefined ? updatedFields.plainText : (selectedElement.content || '');
+    }
+
+    const updatedElements = elements.map(el => {
+      if (el.id === selectedId) {
+        return {
+          ...el,
+          qrHelperType: helperType,
+          qrHelperFields: updatedFields,
+          content: compiledValue
+        };
+      }
+      return el;
+    });
+
+    setElements(updatedElements);
+  };
+
+  const renderQRInspector = (el) => {
+    const helperType = el.qrHelperType || 'text';
+    const fields = el.qrHelperFields || {};
+
+    return (
+      <div className="flex flex-col gap-3">
+        {/* Helper Type Selector */}
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">QR Content Helper</label>
+          <select
+            value={helperType}
+            onChange={(e) => {
+              updateQRHelper(e.target.value, {});
+              pushHistory(elementsRef.current);
+            }}
+            className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
+          >
+            <option value="text" className="bg-slate-900 text-slate-100">Plain Text / URL</option>
+            <option value="wifi" className="bg-slate-900 text-slate-100">WiFi Network</option>
+            <option value="vcard" className="bg-slate-900 text-slate-100">vCard Contact</option>
+            <option value="phone" className="bg-slate-900 text-slate-100">Phone Call</option>
+          </select>
+        </div>
+
+        {/* Plain Text / URL Fields */}
+        {helperType === 'text' && (
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">QR Code Text / URL</label>
+            <input
+              type="text"
+              value={el.content || ''}
+              onChange={(e) => updateQRHelper('text', { plainText: e.target.value })}
+              onBlur={() => pushHistory(elementsRef.current)}
+              className="w-full p-2.5 rounded-xl glass-input text-sm"
+              placeholder="https://example.com or any text"
+            />
+          </div>
+        )}
+
+        {/* WiFi Network Fields */}
+        {helperType === 'wifi' && (
+          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Network Name (SSID)</label>
+              <input
+                type="text"
+                value={fields.wifiSsid || ''}
+                onChange={(e) => updateQRHelper('wifi', { wifiSsid: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="MyHomeWiFi"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Password</label>
+              <input
+                type="text"
+                value={fields.wifiPassword || ''}
+                onChange={(e) => updateQRHelper('wifi', { wifiPassword: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="WiFi Password"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Encryption</label>
+              <select
+                value={fields.wifiEncryption || 'WPA'}
+                onChange={(e) => {
+                  updateQRHelper('wifi', { wifiEncryption: e.target.value });
+                  pushHistory(elementsRef.current);
+                }}
+                className="w-full p-2 rounded-lg glass-input text-xs text-indigo-300 font-medium"
+              >
+                <option value="WPA" className="bg-slate-900 text-slate-100">WPA / WPA2 / WPA3</option>
+                <option value="WEP" className="bg-slate-900 text-slate-100">WEP</option>
+                <option value="None" className="bg-slate-900 text-slate-100">None (Open Network)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* vCard Contact Fields */}
+        {helperType === 'vcard' && (
+          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">First Name</label>
+                <input
+                  type="text"
+                  value={fields.vcardFirstName || ''}
+                  onChange={(e) => updateQRHelper('vcard', { vcardFirstName: e.target.value })}
+                  onBlur={() => pushHistory(elementsRef.current)}
+                  className="w-full p-2 rounded-lg glass-input text-xs"
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Last Name</label>
+                <input
+                  type="text"
+                  value={fields.vcardLastName || ''}
+                  onChange={(e) => updateQRHelper('vcard', { vcardLastName: e.target.value })}
+                  onBlur={() => pushHistory(elementsRef.current)}
+                  className="w-full p-2 rounded-lg glass-input text-xs"
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Phone Number</label>
+              <input
+                type="text"
+                value={fields.vcardPhone || ''}
+                onChange={(e) => updateQRHelper('vcard', { vcardPhone: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="+1 555-123-4567"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Email Address</label>
+              <input
+                type="email"
+                value={fields.vcardEmail || ''}
+                onChange={(e) => updateQRHelper('vcard', { vcardEmail: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="john@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Organization / Company</label>
+              <input
+                type="text"
+                value={fields.vcardOrg || ''}
+                onChange={(e) => updateQRHelper('vcard', { vcardOrg: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="Acme Corp"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Phone Call Fields */}
+        {helperType === 'phone' && (
+          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Phone Number</label>
+              <input
+                type="text"
+                value={fields.phoneNum || ''}
+                onChange={(e) => updateQRHelper('phone', { phoneNum: e.target.value })}
+                onBlur={() => pushHistory(elementsRef.current)}
+                className="w-full p-2 rounded-lg glass-input text-xs"
+                placeholder="+1 555-123-4567"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Compiled Data String Preview (for non-text helpers) */}
+        {helperType !== 'text' && (
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">Compiled QR Payload</label>
+            <div className="p-2 rounded-lg bg-slate-900 text-indigo-300 font-mono text-[10px] break-all border border-slate-800 max-h-20 overflow-y-auto whitespace-pre-wrap select-all">
+              {el.content || '(empty)'}
+            </div>
+          </div>
+        )}
+
+        {/* QR Size Slider */}
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">QR Size ({el.size || 60}px)</label>
+          <input 
+            type="range" 
+            min="20" 
+            max="180" 
+            value={el.size || 60}
+            onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
+            onMouseUp={() => pushHistory(elementsRef.current)}
+            onTouchEnd={() => pushHistory(elementsRef.current)}
+            className="w-full accent-indigo-500"
+          />
+        </div>
+      </div>
+    );
+  };
+
   const nudgeSelectedElement = (dx, dy) => {
     if (!selectedElement) return;
     const newX = Math.max(0, Math.min(100, Math.round((selectedElement.x + dx) * 10) / 10));
@@ -756,7 +1112,8 @@ export default function App() {
       const posY = (el.y / 100) * canvasHeightPx;
 
       if (el.type === 'text') {
-        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px Inter, sans-serif`;
+        const fontFamily = el.fontFamily === 'monospace' ? 'monospace, "Courier New"' : 'Inter, sans-serif';
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px ${fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(el.content, posX, posY);
@@ -818,7 +1175,8 @@ export default function App() {
       const posY = (el.y / 100) * canvasHeightPx;
 
       if (el.type === 'text') {
-        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px Inter, sans-serif`;
+        const fontFamily = el.fontFamily === 'monospace' ? 'monospace, "Courier New"' : 'Inter, sans-serif';
+        ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px ${fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(el.content, posX, posY);
@@ -1137,6 +1495,32 @@ export default function App() {
               className="hidden" 
             />
           </div>
+
+          {/* Layout Parameters - Snap to Grid & Show Grid Toggles */}
+          <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
+              <Grid className="w-3.5 h-3.5 text-indigo-400" />
+              Layout Parameters
+            </span>
+            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={snapToGrid}
+                onChange={(e) => setSnapToGrid(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+              />
+              Snap to 8px Grid
+            </label>
+            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={showGrid}
+                onChange={(e) => setShowGrid(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+              />
+              Show Grid
+            </label>
+          </div>
         </div>
       )}
 
@@ -1396,11 +1780,11 @@ export default function App() {
                 </button>
               </div>
 
-            {/* Text, QR, Barcode content input */}
-            {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && (
+            {/* Text, Barcode content input */}
+            {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && selectedElement.type !== 'qr' && (
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">
-                  {selectedElement.type === 'qr' ? 'QR Code Text / URL' : selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
+                  {selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
                 </label>
                 <input 
                   type="text" 
@@ -1432,36 +1816,38 @@ export default function App() {
             )}
 
             {selectedElement.type === 'text' && (
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
-                <input 
-                  type="range" 
-                  min="8" 
-                  max="64" 
-                  value={selectedElement.fontSize || 22}
-                  onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
-                  onMouseUp={() => pushHistory(elementsRef.current)}
-                  onTouchEnd={() => pushHistory(elementsRef.current)}
-                  className="w-full accent-indigo-500"
-                />
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Font Family</label>
+                  <select
+                    value={selectedElement.fontFamily || 'sans-serif'}
+                    onChange={(e) => {
+                      updateSelectedElement('fontFamily', e.target.value);
+                      pushHistory(elementsRef.current);
+                    }}
+                    className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
+                  >
+                    <option value="sans-serif" className="bg-slate-900 text-slate-100">Sans-serif</option>
+                    <option value="monospace" className="bg-slate-900 text-slate-100">Monospace</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
+                  <input 
+                    type="range" 
+                    min="8" 
+                    max="64" 
+                    value={selectedElement.fontSize || 22}
+                    onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
+                    onMouseUp={() => pushHistory(elementsRef.current)}
+                    onTouchEnd={() => pushHistory(elementsRef.current)}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
               </div>
             )}
 
-            {selectedElement.type === 'qr' && (
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
-                <input 
-                  type="range" 
-                  min="20" 
-                  max="180" 
-                  value={selectedElement.size || 60}
-                  onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
-                  onMouseUp={() => pushHistory(elementsRef.current)}
-                  onTouchEnd={() => pushHistory(elementsRef.current)}
-                  className="w-full accent-indigo-500"
-                />
-              </div>
-            )}
+            {selectedElement.type === 'qr' && renderQRInspector(selectedElement)}
 
             {(selectedElement.type === 'image' || selectedElement.type === 'barcode' || selectedElement.type === 'line' || selectedElement.type === 'rectangle') && (
               <div className="flex flex-col gap-3">
@@ -1792,12 +2178,58 @@ export default function App() {
               <div 
                 ref={containerRef}
                 onClick={() => setSelectedId(null)}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{ 
                   width: `${canvasWidthPx}px`, 
-                  height: `${canvasHeightPx}px` 
+                  height: `${canvasHeightPx}px`,
+                  ...(showGrid ? {
+                    backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)',
+                    backgroundSize: '8px 8px'
+                  } : {})
                 }}
                 className="bg-white rounded-lg shadow-2xl shadow-indigo-500/10 border-2 border-slate-300 relative select-none overflow-visible"
               >
+                {/* Alignment Guides Overlay Layer */}
+                {draggingId !== null && alignmentGuides.length > 0 && (
+                  <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden rounded-md">
+                    {alignmentGuides.map((guide, idx) => {
+                      if (guide.type === 'vertical') {
+                        return (
+                          <div
+                            key={`v-${idx}-${guide.x}`}
+                            style={{
+                              position: 'absolute',
+                              left: `${guide.x}%`,
+                              top: 0,
+                              bottom: 0,
+                              width: '1px',
+                              borderLeft: '1px dashed #ef4444',
+                              transform: 'translateX(-50%)'
+                            }}
+                          />
+                        );
+                      } else if (guide.type === 'horizontal') {
+                        return (
+                          <div
+                            key={`h-${idx}-${guide.y}`}
+                            style={{
+                              position: 'absolute',
+                              top: `${guide.y}%`,
+                              left: 0,
+                              right: 0,
+                              height: '1px',
+                              borderTop: '1px dashed #ef4444',
+                              transform: 'translateY(-50%)'
+                            }}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                )}
                 {/* Empty canvas hint */}
                 {elements.length === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-300/40 select-none gap-2">
@@ -1821,7 +2253,11 @@ export default function App() {
                       className="p-1.5 whitespace-nowrap text-slate-900"
                     >
                       {el.type === 'text' && (
-                        <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
+                        <span style={{ 
+                          fontSize: `${el.fontSize}px`, 
+                          fontWeight: el.fontStyle,
+                          fontFamily: el.fontFamily === 'monospace' ? 'monospace, "Courier New", monospace' : 'inherit'
+                        }}>
                           {el.content}
                         </span>
                       )}
@@ -1931,7 +2367,11 @@ export default function App() {
                         {/* Transparent Footprint for Click/Drag Targeting */}
                         <div className="opacity-0 pointer-events-none">
                           {el.type === 'text' && (
-                            <span style={{ fontSize: `${el.fontSize}px`, fontWeight: el.fontStyle }}>
+                            <span style={{ 
+                              fontSize: `${el.fontSize}px`, 
+                              fontWeight: el.fontStyle,
+                              fontFamily: el.fontFamily === 'monospace' ? 'monospace, "Courier New", monospace' : 'inherit'
+                            }}>
                               {el.content}
                             </span>
                           )}
@@ -1977,10 +2417,10 @@ export default function App() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    {selectedElement.type !== 'image' && (
+                    {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && selectedElement.type !== 'qr' && (
                       <div>
                         <label className="text-xs text-slate-400 mb-1 block">
-                          {selectedElement.type === 'qr' ? 'QR Code Text / URL' : 'Text Content'}
+                          {selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
                         </label>
                         <input 
                           type="text" 
@@ -1991,21 +2431,30 @@ export default function App() {
                       </div>
                     )}
                     {selectedElement.type === 'text' && (
-                      <div>
-                        <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
-                        <input type="range" min="8" max="64" value={selectedElement.fontSize || 22}
-                          onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
-                          className="w-full accent-indigo-500" />
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 mb-1 block">Font Family</label>
+                          <select
+                            value={selectedElement.fontFamily || 'sans-serif'}
+                            onChange={(e) => {
+                              updateSelectedElement('fontFamily', e.target.value);
+                              pushHistory(elementsRef.current);
+                            }}
+                            className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
+                          >
+                            <option value="sans-serif" className="bg-slate-900 text-slate-100">Sans-serif</option>
+                            <option value="monospace" className="bg-slate-900 text-slate-100">Monospace</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
+                          <input type="range" min="8" max="64" value={selectedElement.fontSize || 22}
+                            onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
+                            className="w-full accent-indigo-500" />
+                        </div>
                       </div>
                     )}
-                    {selectedElement.type === 'qr' && (
-                      <div>
-                        <label className="text-xs text-slate-400 mb-1 block">QR Size ({selectedElement.size || 60}px)</label>
-                        <input type="range" min="20" max="180" value={selectedElement.size || 60}
-                          onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
-                          className="w-full accent-indigo-500" />
-                      </div>
-                    )}
+                    {selectedElement.type === 'qr' && renderQRInspector(selectedElement)}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <div className="flex justify-between items-center mb-1">

@@ -4,7 +4,7 @@ import json
 import base64
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from PIL import Image, ImageDraw, ImageFont
 import barcode
 from barcode.writer import ImageWriter
@@ -53,6 +53,27 @@ class PrintCanvasRequest(BaseModel):
     image_base64: str = Field(..., description="Base64 encoded PNG/JPEG image from canvas")
     width_mm: float = 14.0
     height_mm: float = 40.0
+    gap_mm: float = 5.0
+    density: int = 3
+    copies: int = 1
+    dither_method: str = "threshold"
+
+class DirectPrintTextRequest(BaseModel):
+    text: str = Field(..., description="Main plain text content to render and print")
+    font_family: str = Field(
+        "sans-serif",
+        validation_alias=AliasChoices("font_family", "fontFamily"),
+        description="Font family: 'sans-serif' or 'monospace'"
+    )
+    font_size: Optional[int] = Field(
+        None,
+        validation_alias=AliasChoices("font_size", "fontSize"),
+        description="Font size in points/dots"
+    )
+    bold: bool = Field(False, description="Bold font weight")
+    align: str = Field("center", description="Text alignment: 'left', 'center', or 'right'")
+    width_mm: float = 40.0
+    height_mm: float = 14.0
     gap_mm: float = 5.0
     density: int = 3
     copies: int = 1
@@ -209,6 +230,76 @@ def print_canvas_label_job(req: PrintCanvasRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Print error: {e}")
 
+def render_direct_text_image(req: DirectPrintTextRequest) -> Image.Image:
+    """Render plain text centered on a white PIL image using monospace or sans font with bold and align options."""
+    w_dots = mm_to_dots(req.width_mm, settings.DPI)
+    h_dots = mm_to_dots(req.height_mm, settings.DPI)
+    
+    img = Image.new("L", (w_dots, h_dots), 255)
+    draw = ImageDraw.Draw(img)
+    
+    if req.font_size and req.font_size > 0:
+        font_size = req.font_size
+    else:
+        font_size = max(12, int(h_dots * 0.4))
+        
+    font_family = (req.font_family or "sans-serif").lower()
+    if font_family in ("monospace", "mono"):
+        font_path = (
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"
+            if req.bold
+            else "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"
+        )
+    else:
+        font_path = (
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+            if req.bold
+            else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+        )
+        
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+    except IOError:
+        try:
+            fallback_name = "DejaVuSansMono.ttf" if font_family in ("monospace", "mono") else "arial.ttf"
+            font = ImageFont.truetype(fallback_name, font_size)
+        except IOError:
+            font = ImageFont.load_default()
+            
+    align_mode = (req.align or "center").lower()
+    if align_mode == "left":
+        x = 10
+        anchor = "lm"
+    elif align_mode == "right":
+        x = w_dots - 10
+        anchor = "rm"
+    else:  # center
+        x = w_dots // 2
+        anchor = "mm"
+        
+    y = h_dots // 2
+    draw.text((x, y), req.text, fill=0, font=font, anchor=anchor, align=align_mode)
+    return img
+
+@router.post("/print/text")
+def print_direct_text_job(req: DirectPrintTextRequest):
+    """Renders plain text on a white image, dithers it, builds TSPL stream, and prints using get_driver()."""
+    img = render_direct_text_image(req)
+    mono_img = dither_image(img, method=req.dither_method)
+    
+    builder = TSPLStreamBuilder(width_mm=req.width_mm, height_mm=req.height_mm, gap_mm=req.gap_mm)
+    builder.set_density(req.density).set_copies(req.copies)
+    tspl_payload = builder.build_from_image(mono_img)
+    
+    driver = get_driver()
+    success = driver.send_bytes(tspl_payload)
+    driver.disconnect()
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to transmit print payload to printer")
+        
+    return {"status": "success", "bytes_sent": len(tspl_payload), "copies": req.copies}
+
 def generate_barcode(data: str, code_type: str = "code128") -> Optional[Image.Image]:
     """Generate 1D barcode image using python-barcode."""
     try:
@@ -258,15 +349,26 @@ def render_template_image(template_data: Dict[str, Any], variables: Dict[str, st
         if el_type == "text":
             font_size = el.get("fontSize", 16)
             font_style = el.get("fontStyle", "normal")
+            font_family = el.get("fontFamily", "sans-serif")
             
             try:
-                # Standard Liberation font paths in Debian/Ubuntu
-                font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", font_size)
-                if font_style == "bold":
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", font_size)
+                if font_family == "monospace":
+                    font_path = (
+                        "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"
+                        if font_style == "bold"
+                        else "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"
+                    )
+                else:
+                    font_path = (
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+                        if font_style == "bold"
+                        else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+                    )
+                font = ImageFont.truetype(font_path, font_size)
             except IOError:
                 try:
-                    font = ImageFont.truetype("arial.ttf", font_size)
+                    fallback_name = "DejaVuSansMono.ttf" if font_family == "monospace" else "arial.ttf"
+                    font = ImageFont.truetype(fallback_name, font_size)
                 except IOError:
                     font = ImageFont.load_default()
                     

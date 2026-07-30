@@ -34,11 +34,14 @@ class Settings(BaseSettings):
     
     # Presets
     PRESETS: list = [
-        {"name": "14x40mm White Gap", "width": 14, "height": 40, "gap": 5, "type": 0},
+        {"name": "14x40mm Standard Gap", "width": 14, "height": 40, "gap": 5, "type": 0},
         {"name": "12x40mm White Gap", "width": 12, "height": 40, "gap": 5, "type": 0},
-        {"name": "12x30mm White Gap", "width": 12, "height": 30, "gap": 5, "type": 0},
-        {"name": "12x22mm White Gap", "width": 12, "height": 22, "gap": 5, "type": 0},
-        {"name": "15x50mm Cable Label", "width": 15, "height": 50, "gap": 5, "type": 4},
+        {"name": "20x30mm Small", "width": 20, "height": 30, "gap": 5, "type": 0},
+        {"name": "15x30mm Micro", "width": 15, "height": 30, "gap": 5, "type": 0},
+        {"name": "12x30mm Compact", "width": 12, "height": 30, "gap": 5, "type": 0},
+        {"name": "30x30mm Square", "width": 30, "height": 30, "gap": 5, "type": 0},
+        {"name": "12x22mm Mini", "width": 12, "height": 22, "gap": 5, "type": 0},
+        {"name": "15x50mm Cable Flag Wrap", "width": 15, "height": 50, "gap": 5, "type": 4},
         {"name": "12mm Continuous Roll", "width": 12, "height": 50, "gap": 0, "type": 1},
     ]
 

@@ -51,5 +51,22 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "updated")
 
+    def test_post_print_text(self):
+        payload = {
+            "text": "HA DIRECT TEXT",
+            "font_family": "monospace",
+            "bold": True,
+            "align": "center",
+            "width_mm": 40.0,
+            "height_mm": 14.0,
+            "gap_mm": 5.0,
+            "copies": 1
+        }
+        response = client.post("/api/print/text", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("bytes_sent", data)
+
 if __name__ == "__main__":
     unittest.main()
