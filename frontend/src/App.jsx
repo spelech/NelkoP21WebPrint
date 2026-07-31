@@ -37,6 +37,7 @@ import {
   Square
 } from 'lucide-react';
 import { browserBtDriver } from './utils/webBluetoothDriver';
+import QRCode from 'qrcode';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
 import { MDI_OFFLINE } from './utils/mdiIcons';
 import ThemeSelector from './components/ThemeSelector';
@@ -759,7 +760,7 @@ export default function App() {
         setElements(prev => [...prev, newEl]);
         setSelectedId(newEl.id);
       };
-      img.src = evt.target.result;
+      img.src = String(evt.target.result);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -809,7 +810,7 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const parsed = JSON.parse(evt.target.result);
+        const parsed = JSON.parse(String(evt.target.result));
         if (parsed.elements && parsed.preset) {
           pushHistory(parsed.elements);
           setElements(parsed.elements);

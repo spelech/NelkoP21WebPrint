@@ -27,9 +27,10 @@ class WebBluetoothPrinterDriver {
    */
   async requestConnection() {
     try {
+      const nav = /** @type {any} */ (navigator);
       // 1. Try Web Serial API first (Supported in Chrome Android & Desktop for Bluetooth & USB Serial ports)
-      if ('serial' in navigator) {
-        this.serialPort = await navigator.serial.requestPort();
+      if ('serial' in nav) {
+        this.serialPort = await nav.serial.requestPort();
         
         // Try opening with standard baud rates (9600 first, fallback to 115200)
         try {
@@ -53,8 +54,8 @@ class WebBluetoothPrinterDriver {
       }
 
       // 2. Try Web Bluetooth API fallback
-      if ('bluetooth' in navigator) {
-        this.gattDevice = await navigator.bluetooth.requestDevice({
+      if ('bluetooth' in nav) {
+        this.gattDevice = await nav.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ['00001101-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb']
         });

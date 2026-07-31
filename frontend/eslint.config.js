@@ -28,7 +28,6 @@ export default [
         FileReader: "readonly",
         alert: "readonly",
         confirm: "readonly",
-        QRCode: "readonly",
         process: "readonly",
         URL: "readonly",
         TextEncoder: "readonly",
