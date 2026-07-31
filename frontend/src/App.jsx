@@ -149,55 +149,80 @@ export default function App() {
   // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
   const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
 
-  // MDI Icons Search State
+  // MDI Icons Search State & Debouncing
   const [iconSearch, setIconSearch] = useState('');
   const [iconResults, setIconResults] = useState([]);
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
+  const searchAbortControllerRef = useRef(null);
 
-  const handleSearchIcons = async (query) => {
-    setIconSearch(query);
-    if (!query) {
+  useEffect(() => {
+    if (!iconSearch) {
       setIconResults([]);
+      setIsSearchingIcons(false);
       return;
     }
-    
-    // 1. Search local offline curated catalog first
-    const matches = [];
-    Object.entries(MDI_OFFLINE).forEach(([cat, icons]) => {
-      icons.forEach(ic => {
-        if (ic.name.toLowerCase().includes(query.toLowerCase())) {
-          matches.push({ ...ic, source: 'offline' });
-        }
+
+    setIsSearchingIcons(true);
+
+    const delayDebounceFn = setTimeout(async () => {
+      // Cancel previous search fetch
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      searchAbortControllerRef.current = controller;
+
+      // 1. Search local offline curated catalog first
+      const matches = [];
+      Object.entries(MDI_OFFLINE).forEach(([cat, icons]) => {
+        icons.forEach(ic => {
+          if (ic.name.toLowerCase().includes(iconSearch.toLowerCase())) {
+            matches.push({ ...ic, source: 'offline' });
+          }
+        });
       });
-    });
+      setIconResults(matches);
 
-    setIconResults(matches);
-
-    // 2. Fetch online MDI catalog via Iconify if internet is present
-    if (navigator.onLine) {
-      setIsSearchingIcons(true);
-      try {
-        const res = await fetch(`https://api.iconify.design/search?query=${encodeURIComponent(query)}&prefix=mdi`);
-        const data = await res.json();
-        if (data.icons && data.icons.length > 0) {
-          const webMatches = [];
-          for (let i = 0; i < Math.min(data.icons.length, 12); i++) {
-            const fullName = data.icons[i];
-            const cleanName = fullName.replace('mdi:', '');
-            // Prevent duplicates
-            if (!matches.some(m => m.name === cleanName)) {
-              webMatches.push({ name: cleanName, source: 'online' });
+      // 2. Fetch online mdi catalog via Iconify
+      if (navigator.onLine) {
+        try {
+          const res = await fetch(
+            `https://api.iconify.design/search?query=${encodeURIComponent(iconSearch)}&prefix=mdi`,
+            { signal: controller.signal }
+          );
+          const data = await res.json();
+          if (data.icons && data.icons.length > 0) {
+            const webMatches = [];
+            for (let i = 0; i < Math.min(data.icons.length, 12); i++) {
+              const fullName = data.icons[i];
+              const cleanName = fullName.replace('mdi:', '');
+              if (!matches.some(m => m.name === cleanName)) {
+                webMatches.push({ name: cleanName, source: 'online' });
+              }
+            }
+            if (!controller.signal.aborted) {
+              setIconResults(prev => [...prev, ...webMatches]);
             }
           }
-          setIconResults(prev => [...prev, ...webMatches]);
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.warn("Iconify lookup failed:", err);
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            setIsSearchingIcons(false);
+          }
         }
-      } catch (err) {
-        console.warn("Iconify lookup failed:", err);
-      } finally {
+      } else {
         setIsSearchingIcons(false);
       }
-    }
-  };
+    }, 300);
+
+    return () => {
+      clearTimeout(delayDebounceFn);
+    };
+  }, [iconSearch]);
 
   const handleSelectWebIcon = async (iconName) => {
     try {
@@ -765,6 +790,15 @@ export default function App() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleClearCanvas = () => {
+    if (elements.length === 0) return;
+    if (window.confirm("Are you sure you want to clear all elements and start fresh?")) {
+      pushHistory([]);
+      setElements([]);
+      setSelectedId(null);
+    }
   };
 
   const updateSelectedElement = (key, val) => {
@@ -1490,19 +1524,28 @@ export default function App() {
                 </div>
               )}
 
-              {/* Import / Export Layout Action Buttons */}
+              {/* Layout Action Buttons (Export, Import, Clear) */}
               <div className="flex gap-2">
                 <button 
                   onClick={handleExportLayout}
-                  className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+                  title="Export current canvas layout as JSON file"
                 >
-                  Export Layout
+                  Export
                 </button>
                 <button 
                   onClick={() => layoutFileInputRef.current?.click()}
-                  className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+                  title="Import a previously saved canvas layout JSON"
                 >
-                  Import Layout
+                  Import
+                </button>
+                <button 
+                  onClick={handleClearCanvas}
+                  className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition text-center"
+                  title="Clear all elements from canvas to start fresh"
+                >
+                  Clear
                 </button>
                 <input 
                   type="file" 
@@ -1633,7 +1676,7 @@ export default function App() {
                 type="text" 
                 placeholder="Search icons (e.g., home, star)..."
                 value={iconSearch}
-                onChange={(e) => handleSearchIcons(e.target.value)}
+                onChange={(e) => setIconSearch(e.target.value)}
                 className="w-full p-2.5 mb-3 rounded-xl glass-input text-sm"
               />
               
@@ -1673,9 +1716,12 @@ export default function App() {
                             <path d={ic.path} />
                           </svg>
                         ) : (
-                          <span className="text-xs font-medium text-indigo-300 truncate w-full text-center">
-                            {ic.name.substring(0, 8)}
-                          </span>
+                          <img 
+                            src={`https://api.iconify.design/mdi/${ic.name}.svg?color=%23cbd5e1`} 
+                            alt={ic.name}
+                            className="w-5 h-5 object-contain"
+                            loading="lazy"
+                          />
                         )}
                         {ic.source === 'online' && (
                           <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500"></div>
