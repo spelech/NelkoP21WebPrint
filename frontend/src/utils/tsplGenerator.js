@@ -78,7 +78,7 @@ export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, d
           // Grayscale luminance
           const lum = a < 128 ? 255 : Math.round(0.299 * r + 0.587 * g + 0.114 * b);
 
-          let isBlack = false;
+          let isBlack;
           if (ditherMethod === 'bayer16') {
             const bayerVal = BAYER_16x16[y % 16][xPixel % 16];
             isBlack = lum < bayerVal;

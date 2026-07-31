@@ -38,7 +38,7 @@ class WebBluetoothPrinterDriver {
           try {
             await this.serialPort.open({ baudRate: 115200 });
           } catch (retryErr) {
-            throw new Error(`Failed to open serial port (${openErr.message}). NOTE for Windows: Bluetooth SPP creates 2 COM ports (Incoming & Outgoing). Please try selecting the OTHER "Standard Serial over Bluetooth" port in the list, or connect via USB cable.`);
+            throw new Error(`Failed to open serial port (${openErr.message}). NOTE for Windows: Bluetooth SPP creates 2 COM ports (Incoming & Outgoing). Please try selecting the OTHER "Standard Serial over Bluetooth" port in the list, or connect via USB cable.`, { cause: retryErr });
           }
         }
 
