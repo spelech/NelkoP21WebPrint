@@ -1376,8 +1376,8 @@ export default function App() {
   // Sidebar content as a reusable component (rendered in desktop aside OR mobile panel)
   const SidebarContent = ({ mobileTab }) => (
     <>
-      {/* Connection Target Switcher — always visible */}
-      {(!mobileTab || mobileTab === 'print') && (
+      {/* Connection Target Switcher — mobile only */}
+      {mobileTab === 'print' && (
         <div>
           <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
@@ -1747,24 +1747,42 @@ export default function App() {
 
           {/* Connection button hidden on mobile (accessible via Print tab) */}
           <div className="hidden md:flex items-center gap-3">
-            {useBrowserBt ? (
-              <button 
-                onClick={() => setShowWizardModal(true)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair PC/Browser BT'}</span>
-              </button>
-            ) : (
-              <button 
-                onClick={() => setShowSettings(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
-              >
-                <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Server Bridge: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
-                <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
-              </button>
-            )}
+            <div className="flex items-center gap-2 bg-slate-900/55 p-1 rounded-xl border border-slate-800/80">
+              {/* Target Segmented Switcher */}
+              <div className="flex items-center p-0.5 rounded-lg bg-slate-950 border border-slate-850">
+                <button 
+                  onClick={() => setUseBrowserBt(true)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Browser BT
+                </button>
+                <button 
+                  onClick={() => setUseBrowserBt(false)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Server Bridge
+                </button>
+              </div>
+
+              {useBrowserBt ? (
+                <button 
+                  onClick={() => setShowWizardModal(true)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${browserBtConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'}`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>{browserBtConnected ? `BT: ${browserBtDeviceName}` : 'Pair'}</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-input text-xs font-medium hover:border-indigo-500/50 transition"
+                >
+                  <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Server Bridge: <strong className="uppercase">{driverConfig.driver_type}</strong></span>
+                  <Settings className="w-3.5 h-3.5 text-slate-400 ml-1" />
+                </button>
+              )}
+            </div>
             <button 
               onClick={handleGeneratePreview}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition shadow-sm"
@@ -1799,6 +1817,75 @@ export default function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Toolbar / Presets — desktop only */}
         <aside className="hidden md:flex w-80 border-r border-slate-800 glass-panel p-5 flex-col gap-6 overflow-y-auto">
+          {/* Print Options — desktop only at top */}
+          <div className="flex flex-col gap-3 pb-4 border-b border-slate-800/80">
+            <button
+              onClick={() => setCollapsedPrintParams(!collapsedPrintParams)}
+              className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
+            >
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+                <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                Print Parameters
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedPrintParams ? '-rotate-90' : ''}`} />
+            </button>
+
+            {!collapsedPrintParams && (
+              <div className="flex flex-col gap-3 pl-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="15" 
+                      value={density}
+                      onChange={(e) => setDensity(parseInt(e.target.value))}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Copies</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="100" 
+                      value={copies}
+                      onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                      className="w-full p-2 rounded-xl glass-input text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={invertColors}
+                      onChange={(e) => setInvertColors(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                    />
+                    Invert Colors (White-on-Black)
+                  </label>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (elements.length === 0) {
+                      alert("Canvas is empty. Add elements first or load a template.");
+                      return;
+                    }
+                    setShowBatchModal(true);
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 text-xs font-semibold transition"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Batch Print from CSV...
+                </button>
+              </div>
+            )}
+          </div>
+
           <SidebarContent mobileTab={null} />
 
           {/* Element Inspector — desktop */}
@@ -2108,74 +2195,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Print Options */}
-          <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
-            <button
-              onClick={() => setCollapsedPrintParams(!collapsedPrintParams)}
-              className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
-            >
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
-                <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                Print Parameters
-              </span>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedPrintParams ? '-rotate-90' : ''}`} />
-            </button>
-
-            {!collapsedPrintParams && (
-              <div className="flex flex-col gap-3 pl-1">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="15" 
-                      value={density}
-                      onChange={(e) => setDensity(parseInt(e.target.value))}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Copies</label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      max="100" 
-                      value={copies}
-                      onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
-                      className="w-full p-2 rounded-xl glass-input text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox"
-                      checked={invertColors}
-                      onChange={(e) => setInvertColors(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
-                    />
-                    Invert Colors (White-on-Black)
-                  </label>
-                </div>
-
-                <button
-                  onClick={() => {
-                    if (elements.length === 0) {
-                      alert("Canvas is empty. Add elements first or load a template.");
-                      return;
-                    }
-                    setShowBatchModal(true);
-                  }}
-                  className="mt-2 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 text-xs font-semibold transition"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Batch Print from CSV...
-                </button>
-              </div>
-            )}
-          </div>
         </aside>
 
 
