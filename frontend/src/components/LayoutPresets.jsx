@@ -26,7 +26,9 @@ export default function LayoutPresets({
   setCollapsedPresets,
   theme,
   setTheme,
-  PRESETS
+  PRESETS,
+  zoomScale,
+  setZoomScale
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -197,6 +199,24 @@ export default function LayoutPresets({
               />
               Show Grid
             </label>
+
+            {/* Workspace Zoom Control */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-slate-450">Workspace Zoom</span>
+              <div className="flex items-center gap-1 bg-slate-950/70 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                {[1.0, 1.5, 2.0].map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setZoomScale(s)}
+                    className={`px-2.5 py-1 rounded-md font-mono text-[9px] transition-all ${zoomScale === s ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    {s * 100}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="pt-2 border-t border-slate-800/80">
               <ThemeSelector theme={theme} setTheme={setTheme} />
             </div>

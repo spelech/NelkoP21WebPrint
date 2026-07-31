@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Move, QrCode } from 'lucide-react';
+import { QrCode } from 'lucide-react';
 
 export default function CanvasWorkspace({
   zoomScale,
@@ -26,36 +26,6 @@ export default function CanvasWorkspace({
     <main className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-center relative overflow-auto pb-20 md:pb-0">
       {/* Thermal Label Workspace Simulation */}
       <div className="flex flex-col items-center">
-        <div className="text-xs text-slate-400 mb-3 flex items-center gap-2">
-          <FileText className="w-3.5 h-3.5 text-indigo-400" />
-          <span>
-            Canvas Workspace ({activeWidthMm}mm × {activeHeightMm}mm @ 203 DPI = {canvasWidthPx}px × {canvasHeightPx}px) 
-            <span className="ml-2 text-indigo-400 font-medium">
-              ({isPortraitView ? 'Portrait View' : 'Landscape View - Auto 90° Rotated for Printhead'})
-            </span>
-          </span>
-        </div>
-
-        {/* Hint & Zoom Controls */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 flex items-center gap-1.5 shadow-sm">
-            <Move className="w-3 h-3 text-indigo-400" />
-            <span>Click & drag elements on label • Use Arrow Keys to nudge (Shift + Arrow for 5%)</span>
-          </div>
-          <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-full border border-slate-800 text-[11px]">
-            <span className="text-slate-400 px-2 font-medium">Zoom:</span>
-            {[1.0, 1.5, 2.0].map(s => (
-              <button
-                key={s}
-                onClick={() => setZoomScale(s)}
-                className={`px-2 py-0.5 rounded-full font-mono text-[10px] transition ${zoomScale === s ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                {s * 100}%
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Scalable Label Paper Sheet Wrapper */}
         <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="my-4">
           <div 

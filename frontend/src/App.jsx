@@ -1528,6 +1528,8 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           PRESETS={PRESETS}
+          zoomScale={zoomScale}
+          setZoomScale={setZoomScale}
         />
       )}
 
