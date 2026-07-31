@@ -1,0 +1,208 @@
+import React from 'react';
+import { Grid, ChevronDown, RotateCw } from 'lucide-react';
+import ThemeSelector from './ThemeSelector';
+
+export default function LayoutPresets({
+  selectedPreset,
+  setSelectedPreset,
+  isPortraitView,
+  setIsPortraitView,
+  templates,
+  selectedTemplateId,
+  setSelectedTemplateId,
+  setElements,
+  setHistory,
+  setHistoryIndex,
+  elements,
+  handleExportLayout,
+  layoutFileInputRef,
+  handleImportLayout,
+  handleClearCanvas,
+  snapToGrid,
+  setSnapToGrid,
+  showGrid,
+  setShowGrid,
+  collapsedPresets,
+  setCollapsedPresets,
+  theme,
+  setTheme,
+  PRESETS
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        onClick={() => setCollapsedPresets(!collapsedPresets)}
+        className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
+      >
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+          <Grid className="w-3.5 h-3.5 text-indigo-400" />
+          Presets & Layout
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedPresets ? '-rotate-90' : ''}`} />
+      </button>
+
+      {!collapsedPresets && (
+        <div className="flex flex-col gap-4 pl-1">
+          {/* Preset Selector */}
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Label Dimension Preset</label>
+            <select
+              value={selectedPreset.name}
+              onChange={(e) => {
+                const found = PRESETS.find(p => p.name === e.target.value);
+                if (found) {
+                  setSelectedPreset(found);
+                  setSelectedTemplateId(null);
+                  setElements([]);
+                  setHistory([[]]);
+                  setHistoryIndex(0);
+                }
+              }}
+              className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
+            >
+              {PRESETS.map(p => (
+                <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Orientation Toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">Workspace Orientation</span>
+            <button
+              onClick={() => setIsPortraitView(!isPortraitView)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-slate-200 text-xs font-semibold transition"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{isPortraitView ? 'Portrait (Vertical)' : 'Landscape (Horizontal)'}</span>
+            </button>
+          </div>
+
+          {/* Template Database Dropdown */}
+          {templates.length > 0 && (
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Load Design Template</label>
+              <select
+                value={selectedTemplateId || ''}
+                onChange={(e) => {
+                  const tid = e.target.value;
+                  if (!tid) {
+                    setSelectedTemplateId(null);
+                    setElements([]);
+                    setHistory([[]]);
+                    setHistoryIndex(0);
+                  } else {
+                    const t = templates.find(item => item.id === parseInt(tid));
+                    if (t) {
+                      const foundPreset = PRESETS.find(p => p.width === t.width_mm && p.height === t.height_mm) || {
+                        name: `${t.width_mm}x${t.height_mm} mm (Custom)`,
+                        width: t.width_mm,
+                        height: t.height_mm,
+                        gap: 5
+                      };
+                      setSelectedPreset(foundPreset);
+                      
+                      let initialElements = [];
+                      if (t.layout_json) {
+                        try {
+                          initialElements = typeof t.layout_json === 'string' ? JSON.parse(t.layout_json) : t.layout_json;
+                        } catch (err) {
+                          console.error("Failed to parse design JSON:", err);
+                        }
+                      }
+                      
+                      // Preload image elements for the canvas
+                      const imagePreloads = initialElements.map(el => {
+                        if (el.type === 'image' && el.url) {
+                          const img = new Image();
+                          img.onload = () => { el.imgObject = img; };
+                          img.src = el.url;
+                        }
+                        return el;
+                      });
+
+                      setElements(imagePreloads);
+                      setSelectedTemplateId(tid);
+                      setHistory([initialElements]);
+                      setHistoryIndex(0);
+                    }
+                  }
+                }}
+                className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-medium"
+              >
+                <option value="" className="bg-slate-900 text-slate-400">-- Start Blank / No Template --</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
+                    {t.name} ({t.width_mm}x{t.height_mm}mm)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Layout Action Buttons (Export, Import, Clear) */}
+          <div className="flex gap-2">
+            <button 
+              onClick={handleExportLayout}
+              className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+              title="Export current canvas layout as JSON file"
+            >
+              Export
+            </button>
+            <button 
+              onClick={() => layoutFileInputRef.current?.click()}
+              className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+              title="Import a previously saved canvas layout JSON"
+            >
+              Import
+            </button>
+            <button 
+              onClick={handleClearCanvas}
+              className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition text-center"
+              title="Clear all elements from canvas to start fresh"
+            >
+              Clear
+            </button>
+            <input 
+              type="file" 
+              ref={layoutFileInputRef} 
+              onChange={handleImportLayout} 
+              accept=".json" 
+              className="hidden" 
+            />
+          </div>
+
+          {/* Layout Parameters - Snap to Grid & Show Grid Toggles */}
+          <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
+              Layout Settings
+            </span>
+            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={snapToGrid}
+                onChange={(e) => setSnapToGrid(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+              />
+              Snap to 8px Grid
+            </label>
+            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={showGrid}
+                onChange={(e) => setShowGrid(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+              />
+              Show Grid
+            </label>
+            <div className="pt-2 border-t border-slate-800/80">
+              <ThemeSelector theme={theme} setTheme={setTheme} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

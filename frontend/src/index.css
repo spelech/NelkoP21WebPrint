@@ -2,11 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-primary: #090d16;
+  --bg-panel: rgba(15, 23, 42, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #cbd5e1;
+  --text-muted: #64748b;
+  --accent-primary: #4f46e5;
+  --accent-secondary: #7c3aed;
+  --accent-text: #818cf8;
+}
+
+.theme-indigo {
+  --bg-primary: #05041a;
+  --bg-panel: rgba(12, 10, 36, 0.85);
+  --border-color: rgba(99, 102, 241, 0.18);
+  --text-primary: #e0e7ff;
+  --text-muted: #818cf8;
+  --accent-primary: #6366f1;
+  --accent-secondary: #a855f7;
+  --accent-text: #a5b4fc;
+}
+
+.theme-emerald {
+  --bg-primary: #02231c;
+  --bg-panel: rgba(2, 45, 34, 0.85);
+  --border-color: rgba(20, 184, 166, 0.18);
+  --text-primary: #ccfbf1;
+  --text-muted: #14b8a6;
+  --accent-primary: #10b981;
+  --accent-secondary: #06b6d4;
+  --accent-text: #34d399;
+}
+
+.theme-cyberpunk {
+  --bg-primary: #060608;
+  --bg-panel: rgba(20, 20, 22, 0.85);
+  --border-color: rgba(244, 63, 94, 0.22);
+  --text-primary: #ffe4e6;
+  --text-muted: #f43f5e;
+  --accent-primary: #e11d48;
+  --accent-secondary: #f59e0b;
+  --accent-text: #fb7185;
+}
+
+.theme-light {
+  --bg-primary: #f8fafc;
+  --bg-panel: rgba(255, 255, 255, 0.9);
+  --border-color: rgba(226, 232, 240, 0.95);
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+  --accent-primary: #4f46e5;
+  --accent-secondary: #6366f1;
+  --accent-text: #4f46e5;
+}
+
 @layer base {
   body {
     font-family: 'Inter', sans-serif;
-    background-color: #090d16;
-    color: #f8fafc;
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -16,23 +72,29 @@
 
 /* Glassmorphism Cards & Panels */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.85);
+  background: var(--bg-panel) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color) !important;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .glass-input {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
   transition: all 0.2s ease-in-out;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-glow, rgba(99, 102, 241, 0.25));
+}
+
+.theme-light .glass-input {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
 }
 
 /* Custom Scrollbar */
