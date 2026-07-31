@@ -1599,6 +1599,7 @@ export default function App() {
             setShowBatchModal={setShowBatchModal}
             collapsedPrintParams={collapsedPrintParams}
             setCollapsedPrintParams={setCollapsedPrintParams}
+            handleGeneratePreview={handleGeneratePreview}
           />
 
           {renderSidebarContent(null)}

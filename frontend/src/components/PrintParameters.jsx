@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, ChevronDown, Upload } from 'lucide-react';
+import { Sliders, ChevronDown, Upload, Eye } from 'lucide-react';
 
 export default function PrintParameters({
   density,
@@ -11,7 +11,8 @@ export default function PrintParameters({
   elements,
   setShowBatchModal,
   collapsedPrintParams,
-  setCollapsedPrintParams
+  setCollapsedPrintParams,
+  handleGeneratePreview
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -77,6 +78,14 @@ export default function PrintParameters({
           >
             <Upload className="w-3.5 h-3.5" />
             Batch Print from CSV...
+          </button>
+
+          <button
+            onClick={handleGeneratePreview}
+            className="mt-1 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 text-xs font-semibold transition"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Preview Print Output
           </button>
         </div>
       )}

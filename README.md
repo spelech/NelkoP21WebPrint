@@ -20,8 +20,13 @@ An open-source, containerized application suite for the **Nelko P21** thermal la
 ## ✨ Core Features
 
 * **🎨 React Visual Label Studio**: Intuitive **Landscape Workspace** ($40 \times 14\text{mm}$, $30 \times 12\text{mm}$, $50 \times 15\text{mm}$, etc.) with real-time 203 DPI layout editing, text elements, QR codes, and barcodes.
-* **📱 Browser-Direct Bluetooth (Web Serial / Web Bluetooth)**: Print directly from your iPhone, iPad, Android phone, or laptop browser to the printer right next to you anywhere in your house!
+* **📏 Layout Snapping & Center Guides**: Smooth canvas alignment guidelines snapping centers and margins to other elements or the layout center automatically.
+* **📱 Browser-Direct Bluetooth (Web Bluetooth)**: Print directly from your iPhone, iPad, Android phone, or laptop browser to the printer right next to you anywhere in your house!
 * **🔄 Automatic 90° Printhead Rotation**: Design horizontally for maximum readability—the engine automatically rotates the rendered 1-bit monochrome bitmap $90^\circ$ to fit the physical $14\text{mm}$ ($112\text{px}$) thermal printhead as paper feeds out.
+* **🔤 Font Selections**: Selections for Monospace (perfect for serials or code blocks) and Sans-serif fonts rendered natively on both the browser canvas and backend print engine.
+* **📶 Smart QR Content Generators**: Built-in template wizards for generating WIFI (SSID/password/auth), vCard contact, and Phone Call QR codes.
+* **🔍 Touch Pinch-To-Zoom Gestures**: Multi-touch pinch zoom support for seamless layout designer usage on mobile phone screens.
+* **🔒 Strict TypeScript & ESLint Pipeline**: Compiler-enforced JS/JSX typechecking (`tsc --noEmit` and JSDoc annotations) and ESLint rules protecting against ReferenceErrors.
 * **🚀 FastAPI REST API**: Programmatically format and print labels from external scripts, Home Assistant, webhooks, or automation workflows.
 * **🤖 FastMCP AI Tools**: Native Model Context Protocol server enabling AI assistants (Claude, Antigravity, LLMs) to print labels via natural language tool calls.
 * **🔌 Flexible Connection Drivers**:
@@ -154,6 +159,7 @@ NelkoP21WebPrint/
 │   └── vite.config.js
 ├── .github/workflows/          # GitHub Actions CI/CD & GHCR Release
 ├── .env.example                # Sample environment configuration
+├── AGENTS.md                   # AI agent coding guidelines & rules
 ├── Dockerfile                  # Multi-stage Docker build
 ├── docker-compose.yml          # Docker Compose GHCR service
 └── README.md
