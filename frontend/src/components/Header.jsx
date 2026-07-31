@@ -30,7 +30,7 @@ export default function Header({
             <h1 className="text-sm sm:text-base md:text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent truncate select-none">
               P21 Studio
             </h1>
-            <span className="hidden xs:inline-block px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[9px] font-mono font-semibold shrink-0">
+            <span className="inline-block px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[9px] font-mono font-semibold shrink-0">
               v{appVersion}
             </span>
           </div>
