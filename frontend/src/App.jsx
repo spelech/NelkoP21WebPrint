@@ -651,6 +651,13 @@ export default function App() {
     }
   };
 
+  const handleDisconnectBrowserBt = async () => {
+    await browserBtDriver.disconnect();
+    setBrowserBtConnected(false);
+    setBrowserBtDeviceName('');
+    setPrintStatus({ type: 'success', msg: 'Disconnected from Bluetooth device.' });
+  };
+
   // Element Actions
   const addTextElement = () => {
     const newEl = {
