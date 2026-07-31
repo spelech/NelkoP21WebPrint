@@ -68,6 +68,12 @@ export default function App() {
   const [showGrid, setShowGrid] = useState(false);
   const [alignmentGuides, setAlignmentGuides] = useState([]);
 
+  // Collapsable Sidebar Sections State
+  const [collapsedPresets, setCollapsedPresets] = useState(false);
+  const [collapsedAddElements, setCollapsedAddElements] = useState(false);
+  const [collapsedIcons, setCollapsedIcons] = useState(false);
+  const [collapsedPrintParams, setCollapsedPrintParams] = useState(false);
+
   // Undo / Redo History Stack
   const [history, setHistory] = useState([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -1397,268 +1403,300 @@ export default function App() {
       {/* Preset Selection — show in desktop, or 'add' mobile tab */}
       {(!mobileTab || mobileTab === 'add') && (
         <div className="flex flex-col gap-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Grid className="w-3.5 h-3.5 text-indigo-400" />
-                Label Preset
-              </label>
-              <button 
-                onClick={() => setIsPortraitView(!isPortraitView)}
-                className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
-                title="Toggle Landscape / Portrait Editing View"
-              >
-                <RotateCw className="w-3 h-3" />
-                {isPortraitView ? 'Portrait' : 'Landscape'}
-              </button>
-            </div>
-            <select 
-              value={selectedPreset.name}
-              onChange={(e) => {
-                const preset = PRESETS.find(p => p.name === e.target.value);
-                if (preset) {
-                  setSelectedPreset(preset);
-                  setSelectedTemplateId(null); // Clear active template layout name
-                }
-              }}
-              className="w-full p-2.5 rounded-xl glass-input text-sm"
-            >
-              {PRESETS.map(p => (
-                <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <button
+            onClick={() => setCollapsedPresets(!collapsedPresets)}
+            className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
+          >
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+              <Grid className="w-3.5 h-3.5 text-indigo-400" />
+              Presets & Layout
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedPresets ? '-rotate-90' : ''}`} />
+          </button>
 
-          {/* Load templates dropdown */}
-          {templates.length > 0 && (
-            <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                Load Template Layout
-              </label>
-              <select
-                value={selectedTemplateId || ''}
-                onChange={(e) => {
-                  const tid = e.target.value;
-                  if (!tid) {
-                    setSelectedTemplateId(null);
-                    setElements([]);
-                    setHistory([[]]);
-                    setHistoryIndex(0);
-                  } else {
-                    const temp = templates.find(t => t.id === tid);
-                    if (temp) {
-                      const initialElements = temp.data?.elements || temp.elements || [];
-                      setElements(initialElements);
-                      const matchingPreset = PRESETS.find(p => p.width === temp.width_mm && p.height === temp.height_mm) 
-                        || { name: `${temp.width_mm}x${temp.height_mm} mm`, width: temp.width_mm, height: temp.height_mm, gap: temp.data?.gap_mm || 5 };
-                      setSelectedPreset(matchingPreset);
-                      setSelectedTemplateId(tid);
-                      setHistory([initialElements]);
-                      setHistoryIndex(0);
+          {!collapsedPresets && (
+            <div className="flex flex-col gap-4 pl-1">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-slate-400 flex items-center gap-1.5">
+                    Label Preset
+                  </label>
+                  <button 
+                    onClick={() => setIsPortraitView(!isPortraitView)}
+                    className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                    title="Toggle Landscape / Portrait Editing View"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    {isPortraitView ? 'Portrait' : 'Landscape'}
+                  </button>
+                </div>
+                <select 
+                  value={selectedPreset.name}
+                  onChange={(e) => {
+                    const preset = PRESETS.find(p => p.name === e.target.value);
+                    if (preset) {
+                      setSelectedPreset(preset);
+                      setSelectedTemplateId(null); // Clear active template layout name
                     }
-                  }
-                }}
-                className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-medium"
-              >
-                <option value="" className="bg-slate-900 text-slate-400">-- Start Blank / No Template --</option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
-                    {t.name} ({t.width_mm}x{t.height_mm}mm)
-                  </option>
-                ))}
-              </select>
+                  }}
+                  className="w-full p-2.5 rounded-xl glass-input text-sm"
+                >
+                  {PRESETS.map(p => (
+                    <option key={p.name} value={p.name} className="bg-slate-900 text-slate-100">
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Load templates dropdown */}
+              {templates.length > 0 && (
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
+                    Load Template Layout
+                  </label>
+                  <select
+                    value={selectedTemplateId || ''}
+                    onChange={(e) => {
+                      const tid = e.target.value;
+                      if (!tid) {
+                        setSelectedTemplateId(null);
+                        setElements([]);
+                        setHistory([[]]);
+                        setHistoryIndex(0);
+                      } else {
+                        const temp = templates.find(t => t.id === tid);
+                        if (temp) {
+                          const initialElements = temp.data?.elements || temp.elements || [];
+                          setElements(initialElements);
+                          const matchingPreset = PRESETS.find(p => p.width === temp.width_mm && p.height === temp.height_mm) 
+                            || { name: `${temp.width_mm}x${temp.height_mm} mm`, width: temp.width_mm, height: temp.height_mm, gap: temp.data?.gap_mm || 5 };
+                          setSelectedPreset(matchingPreset);
+                          setSelectedTemplateId(tid);
+                          setHistory([initialElements]);
+                          setHistoryIndex(0);
+                        }
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-medium"
+                  >
+                    <option value="" className="bg-slate-900 text-slate-400">-- Start Blank / No Template --</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
+                        {t.name} ({t.width_mm}x{t.height_mm}mm)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Import / Export Layout Action Buttons */}
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleExportLayout}
+                  className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+                >
+                  Export Layout
+                </button>
+                <button 
+                  onClick={() => layoutFileInputRef.current?.click()}
+                  className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
+                >
+                  Import Layout
+                </button>
+                <input 
+                  type="file" 
+                  ref={layoutFileInputRef} 
+                  onChange={handleImportLayout} 
+                  accept=".json" 
+                  className="hidden" 
+                />
+              </div>
+
+              {/* Layout Parameters - Snap to Grid & Show Grid Toggles */}
+              <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
+                  Layout Settings
+                </span>
+                <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={snapToGrid}
+                    onChange={(e) => setSnapToGrid(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                  />
+                  Snap to 8px Grid
+                </label>
+                <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                  />
+                  Show Grid
+                </label>
+              </div>
             </div>
           )}
-
-          {/* Import / Export Layout Action Buttons */}
-          <div className="flex gap-2 mt-2">
-            <button 
-              onClick={handleExportLayout}
-              className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
-            >
-              Export Layout
-            </button>
-            <button 
-              onClick={() => layoutFileInputRef.current?.click()}
-              className="flex-1 py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-300 transition text-center"
-            >
-              Import Layout
-            </button>
-            <input 
-              type="file" 
-              ref={layoutFileInputRef} 
-              onChange={handleImportLayout} 
-              accept=".json" 
-              className="hidden" 
-            />
-          </div>
-
-          {/* Layout Parameters - Snap to Grid & Show Grid Toggles */}
-          <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
-              <Grid className="w-3.5 h-3.5 text-indigo-400" />
-              Layout Parameters
-            </span>
-            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox"
-                checked={snapToGrid}
-                onChange={(e) => setSnapToGrid(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
-              />
-              Snap to 8px Grid
-            </label>
-            <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox"
-                checked={showGrid}
-                onChange={(e) => setShowGrid(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
-              />
-              Show Grid
-            </label>
-          </div>
         </div>
       )}
 
       {/* Add Elements — show in desktop, or 'add' mobile tab */}
       {(!mobileTab || mobileTab === 'add') && (
-        <div>
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5 text-indigo-400" />
-            Add Elements
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            <button 
-              onClick={addTextElement}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-            >
-              <Type className="w-4 h-4 text-indigo-400" />
-              Text
-            </button>
-            <button 
-              onClick={addQRElement}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-            >
-              <QrCode className="w-4 h-4 text-violet-400" />
-              QR
-            </button>
-            <button 
-              onClick={addBarcodeElement}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-            >
-              <Barcode className="w-4 h-4 text-indigo-400" />
-              Barcode
-            </button>
-            <button 
-              onClick={addLineElement}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-            >
-              <Minus className="w-4 h-4 text-amber-400" />
-              Line
-            </button>
-            <button 
-              onClick={addRectangleElement}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-            >
-              <Square className="w-4 h-4 text-sky-400" />
-              Border
-            </button>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
-              title="Upload Graphic / Logo / Image"
-            >
-              <ImageIcon className="w-4 h-4 text-emerald-400" />
-              Image
-            </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleImageUpload} 
-              accept="image/*" 
-              className="hidden" 
-            />
-          </div>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => setCollapsedAddElements(!collapsedAddElements)}
+            className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
+          >
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+              <Plus className="w-3.5 h-3.5 text-indigo-400" />
+              Add Elements
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedAddElements ? '-rotate-90' : ''}`} />
+          </button>
+
+          {!collapsedAddElements && (
+            <div className="grid grid-cols-3 gap-2 pl-1">
+              <button 
+                onClick={addTextElement}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+              >
+                <Type className="w-4 h-4 text-indigo-400" />
+                Text
+              </button>
+              <button 
+                onClick={addQRElement}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+              >
+                <QrCode className="w-4 h-4 text-violet-400" />
+                QR
+              </button>
+              <button 
+                onClick={addBarcodeElement}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+              >
+                <Barcode className="w-4 h-4 text-indigo-400" />
+                Barcode
+              </button>
+              <button 
+                onClick={addLineElement}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+              >
+                <Minus className="w-4 h-4 text-amber-400" />
+                Line
+              </button>
+              <button 
+                onClick={addRectangleElement}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+              >
+                <Square className="w-4 h-4 text-sky-400" />
+                Border
+              </button>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl glass-input hover:bg-slate-850 hover:border-indigo-500/50 text-[11px] font-medium transition"
+                title="Upload Graphic / Logo / Image"
+              >
+                <ImageIcon className="w-4 h-4 text-emerald-400" />
+                Image
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImageUpload} 
+                accept="image/*" 
+                className="hidden" 
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Icons Library Search Panel */}
       {(!mobileTab || mobileTab === 'add') && (
-        <div className="mt-4">
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Icons Library
-          </label>
-          <input 
-            type="text" 
-            placeholder="Search icons (e.g., home, star)..."
-            value={iconSearch}
-            onChange={(e) => handleSearchIcons(e.target.value)}
-            className="w-full p-2.5 mb-3 rounded-xl glass-input text-sm"
-          />
-          
-          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-            {iconSearch === '' ? (
-              // Default Offline Curated Icons Grid
-              Object.values(MDI_OFFLINE).flat().map((ic, i) => (
-                <button
-                  key={`offline-${i}`}
-                  onClick={() => addIconElement(ic.name, ic.path)}
-                  className="flex items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition"
-                  title={ic.name}
-                >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
-                    <path d={ic.path} />
-                  </svg>
-                </button>
-              ))
-            ) : (
-              // Search Results
-              <>
-                {iconResults.map((ic, i) => (
-                  <button
-                    key={`res-${i}`}
-                    onClick={() => {
-                      if (ic.source === 'offline') {
-                        addIconElement(ic.name, ic.path);
-                      } else {
-                        handleSelectWebIcon(ic.name);
-                      }
-                    }}
-                    className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition relative"
-                    title={ic.name}
-                  >
-                    {ic.source === 'offline' ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <button
+            onClick={() => setCollapsedIcons(!collapsedIcons)}
+            className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
+          >
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              Icons Library
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedIcons ? '-rotate-90' : ''}`} />
+          </button>
+
+          {!collapsedIcons && (
+            <div className="pl-1">
+              <input 
+                type="text" 
+                placeholder="Search icons (e.g., home, star)..."
+                value={iconSearch}
+                onChange={(e) => handleSearchIcons(e.target.value)}
+                className="w-full p-2.5 mb-3 rounded-xl glass-input text-sm"
+              />
+              
+              <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+                {iconSearch === '' ? (
+                  // Default Offline Curated Icons Grid
+                  Object.values(MDI_OFFLINE).flat().map((ic, i) => (
+                    <button
+                      key={`offline-${i}`}
+                      onClick={() => addIconElement(ic.name, ic.path)}
+                      className="flex items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition"
+                      title={ic.name}
+                    >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
                         <path d={ic.path} />
                       </svg>
-                    ) : (
-                      <span className="text-xs font-medium text-indigo-300 truncate w-full text-center">
-                        {ic.name.substring(0, 8)}
-                      </span>
+                    </button>
+                  ))
+                ) : (
+                  // Search Results
+                  <>
+                    {iconResults.map((ic, i) => (
+                      <button
+                        key={`res-${i}`}
+                        onClick={() => {
+                          if (ic.source === 'offline') {
+                            addIconElement(ic.name, ic.path);
+                          } else {
+                            handleSelectWebIcon(ic.name);
+                          }
+                        }}
+                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition relative"
+                        title={ic.name}
+                      >
+                        {ic.source === 'offline' ? (
+                          <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
+                            <path d={ic.path} />
+                          </svg>
+                        ) : (
+                          <span className="text-xs font-medium text-indigo-300 truncate w-full text-center">
+                            {ic.name.substring(0, 8)}
+                          </span>
+                        )}
+                        {ic.source === 'online' && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500"></div>
+                        )}
+                      </button>
+                    ))}
+                    {isSearchingIcons && (
+                      <div className="col-span-4 py-4 flex justify-center">
+                        <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
+                      </div>
                     )}
-                    {ic.source === 'online' && (
-                      <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500"></div>
+                    {!isSearchingIcons && iconResults.length === 0 && (
+                      <div className="col-span-4 py-4 text-center text-xs text-slate-500">
+                        No icons found for "{iconSearch}"
+                      </div>
                     )}
-                  </button>
-                ))}
-                {isSearchingIcons && (
-                  <div className="col-span-4 py-4 flex justify-center">
-                    <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
-                  </div>
+                  </>
                 )}
-                {!isSearchingIcons && iconResults.length === 0 && (
-                  <div className="col-span-4 py-4 text-center text-xs text-slate-500">
-                    No icons found for "{iconSearch}"
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -1764,8 +1802,8 @@ export default function App() {
           <SidebarContent mobileTab={null} />
 
           {/* Element Inspector — desktop */}
-          {selectedElement ? (
-            <div className="flex-1 flex flex-col gap-4 border-t border-slate-800/80 pt-4">
+          {selectedElement && (
+            <div className="flex flex-col gap-4 border-t border-slate-800/80 pt-4 pb-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Sliders className="w-3.5 h-3.5 text-indigo-400" />
@@ -2068,68 +2106,75 @@ export default function App() {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
-              Select an element on canvas to edit properties
-            </div>
           )}
 
           {/* Print Options */}
           <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-              Print Parameters
-            </span>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="15" 
-                  value={density}
-                  onChange={(e) => setDensity(parseInt(e.target.value))}
-                  className="w-full accent-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Copies</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="100" 
-                  value={copies}
-                  onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
-                  className="w-full p-2 rounded-xl glass-input text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox"
-                  checked={invertColors}
-                  onChange={(e) => setInvertColors(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
-                />
-                Invert Colors (White-on-Black)
-              </label>
-            </div>
-
             <button
-              onClick={() => {
-                if (elements.length === 0) {
-                  alert("Canvas is empty. Add elements first or load a template.");
-                  return;
-                }
-                setShowBatchModal(true);
-              }}
-              className="mt-2 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 text-xs font-semibold transition"
+              onClick={() => setCollapsedPrintParams(!collapsedPrintParams)}
+              className="flex items-center justify-between w-full text-left focus:outline-none py-1 group"
             >
-              <Upload className="w-3.5 h-3.5" />
-              Batch Print from CSV...
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+                <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                Print Parameters
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${collapsedPrintParams ? '-rotate-90' : ''}`} />
             </button>
+
+            {!collapsedPrintParams && (
+              <div className="flex flex-col gap-3 pl-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="15" 
+                      value={density}
+                      onChange={(e) => setDensity(parseInt(e.target.value))}
+                      className="w-full accent-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Copies</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="100" 
+                      value={copies}
+                      onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                      className="w-full p-2 rounded-xl glass-input text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={invertColors}
+                      onChange={(e) => setInvertColors(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
+                    />
+                    Invert Colors (White-on-Black)
+                  </label>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (elements.length === 0) {
+                      alert("Canvas is empty. Add elements first or load a template.");
+                      return;
+                    }
+                    setShowBatchModal(true);
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 text-xs font-semibold transition"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Batch Print from CSV...
+                </button>
+              </div>
+            )}
           </div>
         </aside>
 
