@@ -343,6 +343,7 @@ export default function App() {
   const [useBrowserBt, setUseBrowserBt] = useState(true);
   const [browserBtConnected, setBrowserBtConnected] = useState(false);
   const [browserBtDeviceName, setBrowserBtDeviceName] = useState('');
+  const [browserBtConnecting, setBrowserBtConnecting] = useState(false);
   
   const [showWizardModal, setShowWizardModal] = useState(false);
   const [wizardTab, setWizardTab] = useState('pc');
@@ -633,15 +634,20 @@ export default function App() {
   // Connect Browser Bluetooth
   const handleConnectBrowserBt = async () => {
     setPrintStatus(null);
-    const res = await browserBtDriver.requestConnection();
-    if (res.success) {
-      setBrowserBtConnected(true);
-      setBrowserBtDeviceName(res.name);
-      setPrintStatus({ type: 'success', msg: `Connected to ${res.name} via browser Bluetooth!` });
-      setShowWizardModal(false);
-    } else {
-      setBrowserBtConnected(false);
-      setPrintStatus({ type: 'error', msg: res.error || 'Failed to connect via browser Bluetooth' });
+    setBrowserBtConnecting(true);
+    try {
+      const res = await browserBtDriver.requestConnection();
+      if (res.success) {
+        setBrowserBtConnected(true);
+        setBrowserBtDeviceName(res.name);
+        setPrintStatus({ type: 'success', msg: `Connected to ${res.name} via browser Bluetooth!` });
+        setShowWizardModal(false);
+      } else {
+        setBrowserBtConnected(false);
+        setPrintStatus({ type: 'error', msg: res.error || 'Failed to connect via browser Bluetooth' });
+      }
+    } finally {
+      setBrowserBtConnecting(false);
     }
   };
 
