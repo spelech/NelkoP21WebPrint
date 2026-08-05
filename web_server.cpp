@@ -156,7 +156,7 @@ const char APP_HTML[] PROGMEM = R"raw(
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.1</span></h1>
+            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.2</span></h1>
             <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
         </div>
 
@@ -458,13 +458,17 @@ void handlePrintApi() {
 }
 
 // Strict Captive Portal Redirection
-void handleNotFound() {
+void handleCaptivePortal() {
     if (isSoftAP()) {
-        webServer.sendHeader("Location", "http://192.168.4.1/login", true);
-        webServer.send(302, "text/plain", "");
-    } else {
-        webServer.send(404, "text/plain", "Not Found");
+        String host = webServer.hostHeader();
+        if (host != "192.168.4.1" && host != "nelko-bridge.local") {
+            webServer.sendHeader("Location", "http://192.168.4.1/login", true);
+            webServer.send(302, "text/plain", "");
+            return;
+        }
     }
+    webServer.sendHeader("Location", "http://192.168.4.1/login", true);
+    webServer.send(302, "text/plain", "");
 }
 
 void initWebServer() {
@@ -480,11 +484,17 @@ void initWebServer() {
     webServer.on("/api/bt/save", HTTP_POST, handleBtSaveApi);
     webServer.on("/api/print", HTTP_POST, handlePrintApi);
 
-    // Captive Portal Detection Handlers
-    webServer.on("/generate_204", handleNotFound);
-    webServer.on("/fwlink", handleNotFound);
-    webServer.on("/hotspot-detect.html", handleNotFound);
-    webServer.onNotFound(handleNotFound);
+    // Captive Portal OS Detection Probe Handlers
+    webServer.on("/generate_204", handleCaptivePortal);
+    webServer.on("/gen_204", handleCaptivePortal);
+    webServer.on("/hotspot-detect.html", handleCaptivePortal);
+    webServer.on("/library/test/success.html", handleCaptivePortal);
+    webServer.on("/success.txt", handleCaptivePortal);
+    webServer.on("/canonical.html", handleCaptivePortal);
+    webServer.on("/nconnect.asp", handleCaptivePortal);
+    webServer.on("/connecttest.txt", handleCaptivePortal);
+    webServer.on("/redirect", handleCaptivePortal);
+    webServer.onNotFound(handleCaptivePortal);
 
     webServer.begin();
     logServer.begin();

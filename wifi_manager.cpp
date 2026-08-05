@@ -41,11 +41,17 @@ void initWiFiManager() {
         Logger::log("Wi-Fi Station connection failed or unconfigured.");
         Logger::log("Starting SoftAP Hotspot & Strict Captive Portal...");
 
+        WiFi.disconnect(true);
+        delay(100);
         WiFi.mode(WIFI_AP);
+
+        IPAddress apIP(192, 168, 4, 1);
+        IPAddress netMask(255, 255, 255, 0);
+        WiFi.softAPConfig(apIP, apIP, netMask);
         WiFi.softAP("Nelko-Bridge-AP");
-        IPAddress apIP = WiFi.softAPIP();
 
         // Redirect all DNS queries (*) to SoftAP IP for strict captive portal
+        dnsServer.setErrorOutputCode(DNSReplyCode::NoError);
         dnsServer.start(53, "*", apIP);
 
         Logger::log("SoftAP Hotspot active: 'Nelko-Bridge-AP'");

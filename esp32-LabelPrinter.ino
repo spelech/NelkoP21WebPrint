@@ -50,6 +50,7 @@ void setup() {
 
     // Start mDNS responder (Works both in Station and SoftAP mode)
     if (MDNS.begin(MDNS_HOSTNAME)) {
+        MDNS.addService("http", "tcp", 80);
         Logger::log("mDNS responder active: http://%s.local", MDNS_HOSTNAME);
     }
 
