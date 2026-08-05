@@ -5,13 +5,19 @@
 // Create config_local.h on your PC to set your private network configurations.
 #if __has_include("config_local.h")
 #include "config_local.h"
-#else
+#endif
 
-// Default fallback configurations (edit these or create config_local.h)
+// Default fallback configurations (overridden by config_local.h if defined)
+#ifndef WIFI_SSID
 #define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASS "YOUR_WIFI_PASSWORD"
-#define PRINTER_MAC {0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+#endif
 
+#ifndef WIFI_PASS
+#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+#endif
+
+#ifndef PRINTER_MAC
+#define PRINTER_MAC {0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
 #endif
 
 // General system overrides
@@ -36,11 +42,11 @@
 #endif
 
 #ifndef ENABLE_PIN_AUTH
-#define ENABLE_PIN_AUTH true  // Set to false to disable PIN prompt entirely
+#define ENABLE_PIN_AUTH true
 #endif
 
 #ifndef APP_VERSION
-#define APP_VERSION "1.1.3"
+#define APP_VERSION "1.1.4"
 #endif
 
 #endif

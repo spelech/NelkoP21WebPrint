@@ -132,7 +132,7 @@ const char APP_HTML[] PROGMEM = R"raw(
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.3</span></h1>
+            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.4</span></h1>
             <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
         </div>
 
