@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "printer_spp.h"
 #include "web_server.h"
+#include "wifi_manager.h"
 
 WiFiServer printServer(TCP_PRINT_PORT);
 WiFiClient printClient;
@@ -15,10 +16,10 @@ void updateStatusLed() {
     unsigned long now = millis();
     
     // Status Logic:
-    // 1. WiFi not connected: Fast Blink (100ms)
-    // 2. WiFi connected, but Bluetooth not: Slow Blink (500ms)
-    // 3. Both connected: Solid ON
-    if (WiFi.status() != WL_CONNECTED) {
+    // 1. SoftAP Hotspot Active: Fast Blink (100ms)
+    // 2. WiFi connected, but Bluetooth searching: Slow Blink (500ms)
+    // 3. Fully Connected & Ready: Solid ON
+    if (isSoftAP()) {
         if (now - lastBlinkTime >= 100) {
             lastBlinkTime = now;
             ledState = !ledState;
@@ -44,49 +45,42 @@ void setup() {
     Logger::init();
     Logger::log("System booting up...");
 
-    // Connect WiFi
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    Logger::log("Connecting to WiFi SSID: %s", WIFI_SSID);
-    
-    // Non-blocking indicator loop during WiFi initiation
-    while (WiFi.status() != WL_CONNECTED) {
-        updateStatusLed();
-        delay(10);
-    }
-    
-    Logger::log("WiFi Connected successfully!");
-    Logger::log("IP Address: %s", WiFi.localIP().toString().c_str());
+    // Initialize Wi-Fi Manager (Connects to saved Wi-Fi or starts SoftAP Hotspot)
+    initWiFiManager();
 
-    // Start mDNS responder
+    // Start mDNS responder (Works both in Station and SoftAP mode)
     if (MDNS.begin(MDNS_HOSTNAME)) {
-        Logger::log("mDNS responder started: http://%s.local", MDNS_HOSTNAME);
+        Logger::log("mDNS responder active: http://%s.local", MDNS_HOSTNAME);
     }
 
     // Connect Bluetooth Printer
     connectPrinter();
 
-    // Start TCP print server
+    // Start TCP print server (JetDirect port 9100)
     printServer.begin();
-    Logger::log("TCP Print Port listener started on port %d.", TCP_PRINT_PORT);
+    Logger::log("TCP Print Port listener active on port %d.", TCP_PRINT_PORT);
 
     // Start Web Server & Log Server
     initWebServer();
 
-    Logger::log("ESP32 Print Bridge is active and listening.");
+    Logger::log("ESP32 Print Bridge & Standalone Designer is ready.");
 }
 
 void loop() {
     // 1. Maintain LED Status
     updateStatusLed();
 
-    // 2. Handle HTTP and Log Clients
+    // 2. Process Wi-Fi Manager & Captive Portal DNS
+    handleWiFiManager();
+
+    // 3. Handle HTTP Requests & Live SSE Log Clients
     handleWebServer();
     Logger::handleClients();
 
-    // 3. Maintain Bluetooth Link (Auto-Reconnect)
+    // 4. Maintain Bluetooth Link (Auto-Reconnect)
     checkPrinterConnection();
 
-    // 4. Handle TCP Print Server Connections (JetDirect Port 9100)
+    // 5. Handle TCP Print Server Connections (Port 9100)
     if (!printClient) {
         printClient = printServer.available();
         if (printClient) {

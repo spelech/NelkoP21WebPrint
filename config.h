@@ -31,4 +31,8 @@
 #define STATUS_LED_PIN 2  // Onboard LED on ESP32-WROOM-32
 #endif
 
+#ifndef DEFAULT_PORTAL_PIN
+#define DEFAULT_PORTAL_PIN "1234"
+#endif
+
 #endif
