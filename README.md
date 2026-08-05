@@ -173,5 +173,5 @@ Sensitivity parameters (SSID, Wi-Fi password, Bluetooth MAC address, default PIN
 1. Install **Arduino IDE 2.0+**.
 2. Go to *Tools -> Board -> Board Manager* and install **esp32** by Espressif Systems.
 3. Select **ESP32 Dev Module** as board target.
-4. Select *Tools -> Partition Scheme -> Huge APP (3MB No OTA / 1MB SPIFFS)* (required to fit Bluetooth Classic + Wi-Fi + WebServer).
+4. Select *Tools -> Partition Scheme -> Minimal SPIFFS (1.9MB APP / 1.9MB OTA)* (enables full Over-The-Air Wi-Fi firmware updates).
 5. Open `esp32-LabelPrinter.ino` and click **Upload**.

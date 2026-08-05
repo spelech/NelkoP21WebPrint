@@ -28,7 +28,7 @@ jobs:
 
       - name: Compile Arduino Sketch
         run: |
-          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --output-dir ./build .
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs --output-dir ./build .
 
       - name: Upload Firmware Binary Artifact
         uses: actions/upload-artifact@v4
