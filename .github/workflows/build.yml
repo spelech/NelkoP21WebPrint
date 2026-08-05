@@ -28,10 +28,10 @@ jobs:
 
       - name: Compile Arduino Sketch
         run: |
-          arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir ./build esp32-labelprinter.ino
+          arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir ./build .
 
       - name: Upload Firmware Binary Artifact
         uses: actions/upload-artifact@v4
         with:
           name: esp32-labelprinter-firmware-v1.0.0
-          path: ./build/esp32-labelprinter.ino.bin
+          path: ./build/*.bin
