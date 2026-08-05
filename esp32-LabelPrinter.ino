@@ -99,6 +99,7 @@ void loop() {
                 if (bytesRead > 0) {
                     if (isPrinterConnected()) {
                         SerialBT.write(buffer, bytesRead);
+                        delay(10);
                         Logger::log("Forwarded %d bytes of print data to printer.", bytesRead);
                     } else {
                         Logger::log("WARNING: Received %d print bytes, but printer is offline!", bytesRead);

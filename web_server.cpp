@@ -147,14 +147,31 @@ const char APP_HTML[] PROGMEM = R"raw(
                 <div class="form-group">
                     <label>Label Size Preset</label>
                     <select id="preset-size">
-                        <option value="14x40">14mm x 40mm (Standard)</option>
-                        <option value="14x30">14mm x 30mm (Short)</option>
-                        <option value="12x40">12mm x 40mm (Slim)</option>
+                        <option value="40x14">40mm x 14mm (Standard)</option>
+                        <option value="30x14">30mm x 14mm (Short)</option>
+                        <option value="40x12">40mm x 12mm (Slim)</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Main Text</label>
                     <input type="text" id="main-text" placeholder="Sample Text" value="Nelko P21">
+                </div>
+                <div class="form-group" style="display:grid; grid-template-cols: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label>Main Text Size</label>
+                        <select id="font-scale-main">
+                            <option value="2" selected>Large (2x)</option>
+                            <option value="3">Extra Large (3x)</option>
+                            <option value="1">Medium (1x)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Subtitle Size</label>
+                        <select id="font-scale-sub">
+                            <option value="1" selected>Medium (1x)</option>
+                            <option value="2">Large (2x)</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Subtitle / Secondary Text</label>
@@ -163,6 +180,16 @@ const char APP_HTML[] PROGMEM = R"raw(
                 <div class="form-group">
                     <label>Code128 Barcode Data</label>
                     <input type="text" id="barcode-data" placeholder="1042598" value="1042598">
+                </div>
+                <div class="form-group" style="display:grid; grid-template-cols: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label>Horizontal Shift (<span id="x-off-val">0</span>px)</label>
+                        <input type="range" id="x-off" min="-30" max="30" value="0" oninput="document.getElementById('x-off-val').textContent=this.value">
+                    </div>
+                    <div>
+                        <label>Vertical Shift (<span id="y-off-val">0</span>px)</label>
+                        <input type="range" id="y-off" min="-20" max="20" value="0" oninput="document.getElementById('y-off-val').textContent=this.value">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Border Thickness (<span id="border-val">2</span>px)</label>
@@ -237,7 +264,11 @@ const char APP_HTML[] PROGMEM = R"raw(
                 main_text: document.getElementById('main-text').value,
                 subtitle: document.getElementById('sub-text').value,
                 barcode_data: document.getElementById('barcode-data').value,
-                border_thickness: parseInt(document.getElementById('border-range').value)
+                border_thickness: parseInt(document.getElementById('border-range').value),
+                x_offset: parseInt(document.getElementById('x-off').value),
+                y_offset: parseInt(document.getElementById('y-off').value),
+                font_scale_main: parseInt(document.getElementById('font-scale-main').value),
+                font_scale_sub: parseInt(document.getElementById('font-scale-sub').value)
             };
 
             fetch('/api/print', {
@@ -319,17 +350,7 @@ const char APP_HTML[] PROGMEM = R"raw(
 )raw";
 
 static bool checkAuth() {
-#if defined(ENABLE_PIN_AUTH) && (ENABLE_PIN_AUTH == false)
-    return true; // PIN authentication disabled in config
-#else
-    String cookie = webServer.header("Cookie");
-    if (isSessionValid(cookie)) {
-        return true;
-    }
-    webServer.sendHeader("Location", "/login");
-    webServer.send(302, "text/plain", "Redirecting to portal login...");
-    return false;
-#endif
+    return true;
 }
 
 void handleLoginRoute() {
@@ -356,7 +377,7 @@ void handleAuthLoginApi() {
 
 void handleRootRoute() {
     if (!checkAuth()) return;
-    webServer.send(200, "text/html", APP_HTML);
+    webServer.send_P(200, "text/html", APP_HTML);
 }
 
 void handleScanApi() {
@@ -427,10 +448,36 @@ void handlePrintApi() {
                 req.barcodeData = body.substring(startQuote + 1, endQuote);
             }
         }
+        if (body.indexOf("x_offset") != -1) {
+            int idx = body.indexOf("\"x_offset\"");
+            int colon = body.indexOf(':', idx);
+            if (colon != -1) req.xOffset = body.substring(colon + 1).toInt();
+        }
+        if (body.indexOf("y_offset") != -1) {
+            int idx = body.indexOf("\"y_offset\"");
+            int colon = body.indexOf(':', idx);
+            if (colon != -1) req.yOffset = body.substring(colon + 1).toInt();
+        }
+        if (body.indexOf("font_scale_main") != -1) {
+            int idx = body.indexOf("\"font_scale_main\"");
+            int colon = body.indexOf(':', idx);
+            if (colon != -1) req.fontScaleMain = body.substring(colon + 1).toInt();
+        }
+        if (body.indexOf("font_scale_sub") != -1) {
+            int idx = body.indexOf("\"font_scale_sub\"");
+            int colon = body.indexOf(':', idx);
+            if (colon != -1) req.fontScaleSub = body.substring(colon + 1).toInt();
+        }
+        if (body.indexOf("border_thickness") != -1) {
+            int idx = body.indexOf("\"border_thickness\"");
+            int colon = body.indexOf(':', idx);
+            if (colon != -1) req.borderThickness = body.substring(colon + 1).toInt();
+        }
 
         String tsplPayload = generateTSPLStream(req);
         if (isPrinterConnected()) {
             SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
+            delay(50);
             Logger::log("Direct API Print: Sent %d bytes of TSPL to printer.", tsplPayload.length());
             webServer.send(200, "application/json", "{\"status\":\"success\"}");
         } else {
@@ -452,8 +499,7 @@ void handleCaptivePortal() {
             return;
         }
     }
-    webServer.sendHeader("Location", "http://192.168.4.1/login", true);
-    webServer.send(302, "text/plain", "");
+    webServer.send(404, "text/plain", "Not Found");
 }
 
 void initWebServer() {

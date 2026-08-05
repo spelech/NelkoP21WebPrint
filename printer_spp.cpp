@@ -11,8 +11,9 @@ static const unsigned long CHECK_INTERVAL_MS = 10000;
 static bool printerConnected = false;
 
 static void loadSavedMAC() {
-    btPreferences.begin("printer-config", false);
+    btPreferences.begin("printer-config", true);
     String savedMac = btPreferences.getString("mac", "");
+    btPreferences.end();
     if (savedMac.length() == 17) {
         sscanf(savedMac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
                &macAddress[0], &macAddress[1], &macAddress[2],
@@ -53,38 +54,22 @@ bool connectPrinter() {
 }
 
 bool isPrinterConnected() {
-    return printerConnected;
+    if (SerialBT.connected()) {
+        printerConnected = true;
+        return true;
+    }
+    Logger::log("Printer disconnected. Attempting on-demand connection...");
+    if (SerialBT.connect(macAddress)) {
+        Logger::log("On-demand Bluetooth connection successful!");
+        printerConnected = true;
+        return true;
+    }
+    printerConnected = false;
+    return false;
 }
 
 void checkPrinterConnection() {
-    unsigned long now = millis();
-    if (now - lastCheckTime >= CHECK_INTERVAL_MS) {
-        lastCheckTime = now;
-
-        bool currentStatus = SerialBT.connected();
-        if (currentStatus != printerConnected) {
-            printerConnected = currentStatus;
-            if (printerConnected) {
-                Logger::log("Bluetooth printer status change: Connected.");
-            } else {
-                Logger::log("Bluetooth printer status change: Disconnected! Attempting reconnect...");
-                if (SerialBT.connect(macAddress)) {
-                    Logger::log("Reconnected to printer successfully!");
-                    printerConnected = true;
-                } else {
-                    Logger::log("Reconnection attempt failed. Will retry.");
-                }
-            }
-        } else if (!printerConnected) {
-            Logger::log("Printer offline. Retrying Bluetooth connection...");
-            if (SerialBT.connect(macAddress)) {
-                Logger::log("Reconnected to printer successfully!");
-                printerConnected = true;
-            } else {
-                Logger::log("Reconnection attempt failed. Will retry.");
-            }
-        }
-    }
+    printerConnected = SerialBT.connected();
 }
 
 String scanBluetoothDevices() {
@@ -167,6 +152,7 @@ bool savePrinterMAC(const String& macStr) {
 
     btPreferences.begin("printer-config", false);
     btPreferences.putString("mac", macStr);
+    btPreferences.end();
     Logger::log("Saved new printer MAC address '%s' to NVS memory.", macStr.c_str());
 
     if (SerialBT.connected()) {

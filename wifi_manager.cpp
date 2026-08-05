@@ -13,9 +13,10 @@ static const unsigned long SESSION_DURATION_MS = 86400000UL; // 24 Hours in mill
 #endif
 
 void initWiFiManager() {
-    preferences.begin("wifi-config", false);
+    preferences.begin("wifi-config", true);
     String ssid = preferences.getString("ssid", WIFI_SSID);
     String pass = preferences.getString("pass", WIFI_PASS);
+    preferences.end();
 
     Logger::log("Initializing Wi-Fi Manager...");
 
@@ -136,8 +137,10 @@ String scanWiFiNetworks() {
 bool saveWiFiCredentials(const String& ssid, const String& pass) {
     if (ssid.length() == 0) return false;
 
+    preferences.begin("wifi-config", false);
     preferences.putString("ssid", ssid);
     preferences.putString("pass", pass);
+    preferences.end();
     Logger::log("Saved new Wi-Fi credentials for SSID '%s' to NVS storage.", ssid.c_str());
     return true;
 }
