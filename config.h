@@ -35,4 +35,8 @@
 #define DEFAULT_PORTAL_PIN "1234"
 #endif
 
+#ifndef APP_VERSION
+#define APP_VERSION "1.0.0"
+#endif
+
 #endif
