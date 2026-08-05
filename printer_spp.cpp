@@ -88,14 +88,20 @@ void checkPrinterConnection() {
 }
 
 String scanBluetoothDevices() {
-    Logger::log("Starting Bluetooth Classic inquiry scan (5s)...");
+    if (ESP.getFreeHeap() < 25000) {
+        Logger::log("WARNING: Heap memory too low for Bluetooth scan (%d bytes free). Aborting scan.", ESP.getFreeHeap());
+        return "[]";
+    }
+
+    Logger::log("Starting Bluetooth Classic inquiry scan (5s)... Free heap: %d bytes", ESP.getFreeHeap());
     
+    // Perform 5-second inquiry scan for Bluetooth Classic devices
     BTScanResults* scanResults = SerialBT.discover(5000);
     String json = "[";
     
     if (scanResults != nullptr) {
         int count = scanResults->getCount();
-        Logger::log("Bluetooth scan finished. Discovered %d devices.", count);
+        Logger::log("Bluetooth scan finished. Discovered %d devices. Free heap: %d bytes", count, ESP.getFreeHeap());
         
         for (int i = 0; i < count; i++) {
             BTAdvertisedDevice* device = scanResults->getDevice(i);
