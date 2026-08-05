@@ -51,7 +51,7 @@ void initWiFiManager() {
         WiFi.softAP("Nelko-Bridge-AP");
 
         // Redirect all DNS queries (*) to SoftAP IP for strict captive portal
-        dnsServer.setErrorOutputCode(DNSReplyCode::NoError);
+        dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
         dnsServer.start(53, "*", apIP);
 
         Logger::log("SoftAP Hotspot active: 'Nelko-Bridge-AP'");
