@@ -142,11 +142,13 @@ const char APP_HTML[] PROGMEM = R"raw(
         .tab-btn { padding: 10px; border: none; background: transparent; color: #94a3b8; font-weight: 600; font-size: 0.85rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .tab-btn.active { background: #312e81; color: #ffffff; }
         .card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid #1e293b; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-top: 0; margin-bottom: 12px; letter-spacing: 0.05em; }
         .form-group { margin-bottom: 14px; }
         label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
         input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #334155; background: #090d16; color: #ffffff; font-size: 0.9rem; box-sizing: border-box; }
         input[type="range"] { width: 100%; accent-color: #6366f1; }
         .btn-primary { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+        .btn-secondary { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer; margin-bottom: 10px; }
         .terminal { background-color: #090d16; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; font-family: monospace; font-size: 0.8rem; color: #38bdf8; height: 220px; overflow-y: auto; white-space: pre-wrap; }
         .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 12px; background: #10b981; color: white; font-weight: 600; font-size: 0.85rem; display: none; z-index: 100; }
     </style>
@@ -154,13 +156,13 @@ const char APP_HTML[] PROGMEM = R"raw(
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.0.0</span></h1>
+            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.0</span></h1>
             <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
         </div>
 
         <div class="nav-tabs">
             <button class="tab-btn active" id="btn-designer" onclick="showTab('designer')">Standalone Designer</button>
-            <button class="tab-btn" id="btn-config" onclick="showTab('config')">Wi-Fi & Diagnostics</button>
+            <button class="tab-btn" id="btn-config" onclick="showTab('config')">Bluetooth & Wi-Fi Settings</button>
         </div>
 
         <!-- TAB 1: Designer -->
@@ -196,27 +198,38 @@ const char APP_HTML[] PROGMEM = R"raw(
 
         <!-- TAB 2: Config & Diagnostics -->
         <div id="tab-config" style="display:none;">
+            <!-- Bluetooth Setup Card -->
             <div class="card">
+                <div class="card-title">Bluetooth Printer Discovery</div>
                 <div class="form-group">
-                    <label>Scan Nearby Wi-Fi Networks</label>
-                    <button class="btn-primary" style="background:#334155; margin-bottom:10px;" onclick="scanWifi()">Scan Networks</button>
+                    <button class="btn-secondary" onclick="scanBt()">Scan Nearby Bluetooth Printers (5s)</button>
+                    <select id="bt-select"><option value="">Select a discovered printer...</option></select>
+                </div>
+                <button class="btn-primary" onclick="saveBt()">Connect & Save Bluetooth Printer</button>
+            </div>
+
+            <!-- Wi-Fi Setup Card -->
+            <div class="card">
+                <div class="card-title">Wi-Fi Network Configuration</div>
+                <div class="form-group">
+                    <button class="btn-secondary" onclick="scanWifi()">Scan Local Wi-Fi Networks</button>
                     <select id="wifi-select"><option value="">Select a network...</option></select>
                 </div>
                 <div class="form-group">
                     <label>Wi-Fi Password</label>
                     <input type="password" id="wifi-pass" placeholder="Network Password">
                 </div>
-                <button class="btn-primary" onclick="saveWifi()">Save Credentials & Reconnect</button>
+                <button class="btn-primary" onclick="saveWifi()">Save Wi-Fi & Reconnect</button>
             </div>
 
             <div class="card">
-                <div style="font-size:0.85rem; font-weight:600; color:#94a3b8; margin-bottom:10px;">Live SSE Log Console</div>
+                <div class="card-title">Live SSE Log Console</div>
                 <div class="terminal" id="log-console">Log stream initializing...</div>
             </div>
         </div>
     </div>
 
-    <div class="toast" id="toast">Label sent to printer!</div>
+    <div class="toast" id="toast">Action completed!</div>
 
     <script>
         function showTab(tab) {
@@ -259,6 +272,36 @@ const char APP_HTML[] PROGMEM = R"raw(
             .then(res => res.json())
             .then(data => { showToast('Printed label successfully!'); })
             .catch(err => { showToast('Print error!'); });
+        }
+
+        function scanBt() {
+            showToast('Scanning Bluetooth printers...');
+            fetch('/api/bt/scan')
+                .then(res => res.json())
+                .then(devices => {
+                    const sel = document.getElementById('bt-select');
+                    sel.innerHTML = '<option value="">Select a discovered printer...</option>';
+                    devices.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.mac;
+                        opt.textContent = `${d.name} (${d.mac}) [${d.rssi} dBm]`;
+                        sel.appendChild(opt);
+                    });
+                    showToast(`Discovered ${devices.length} Bluetooth devices!`);
+                })
+                .catch(err => { showToast('Bluetooth scan error!'); });
+        }
+
+        function saveBt() {
+            const mac = document.getElementById('bt-select').value;
+            if (!mac) { showToast('Please select a Bluetooth printer!'); return; }
+            fetch('/api/bt/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `mac=${encodeURIComponent(mac)}`
+            })
+            .then(res => res.json())
+            .then(data => { showToast('Saved & connected to Bluetooth printer!'); });
         }
 
         function scanWifi() {
@@ -318,7 +361,6 @@ void handleAuthLoginApi() {
         String pin = webServer.arg("pin");
         if (validatePIN(pin)) {
             String token = createSession();
-            // Set 24h session cookie
             webServer.sendHeader("Set-Cookie", "nelko_session=" + token + "; Max-Age=86400; Path=/");
             webServer.send(200, "application/json", "{\"success\":true}");
             return;
@@ -352,13 +394,30 @@ void handleSaveApi() {
     webServer.send(400, "application/json", "{\"error\":\"Missing SSID\"}");
 }
 
+void handleBtScanApi() {
+    if (!checkAuth()) return;
+    String json = scanBluetoothDevices();
+    webServer.send(200, "application/json", json);
+}
+
+void handleBtSaveApi() {
+    if (!checkAuth()) return;
+    if (webServer.hasArg("mac")) {
+        String mac = webServer.arg("mac");
+        if (savePrinterMAC(mac)) {
+            webServer.send(200, "application/json", "{\"status\":\"ok\"}");
+            return;
+        }
+    }
+    webServer.send(400, "application/json", "{\"error\":\"Invalid MAC address\"}");
+}
+
 void handlePrintApi() {
     if (!checkAuth()) return;
     if (webServer.hasArg("plain")) {
         String body = webServer.arg("plain");
         
         SimpleLabelRequest req;
-        // Simple manual parsing of POST parameters
         if (body.indexOf("main_text") != -1) {
             int idx = body.indexOf("\"main_text\"");
             int startQuote = body.indexOf('"', idx + 11);
@@ -417,6 +476,8 @@ void initWebServer() {
     webServer.on("/api/auth/login", HTTP_POST, handleAuthLoginApi);
     webServer.on("/api/wifi/scan", HTTP_GET, handleScanApi);
     webServer.on("/api/wifi/save", HTTP_POST, handleSaveApi);
+    webServer.on("/api/bt/scan", HTTP_GET, handleBtScanApi);
+    webServer.on("/api/bt/save", HTTP_POST, handleBtSaveApi);
     webServer.on("/api/print", HTTP_POST, handlePrintApi);
 
     // Captive Portal Detection Handlers
