@@ -88,33 +88,42 @@ void checkPrinterConnection() {
 }
 
 String scanBluetoothDevices() {
-    if (ESP.getFreeHeap() < 25000) {
-        Logger::log("WARNING: Heap memory too low for Bluetooth scan (%d bytes free). Aborting scan.", ESP.getFreeHeap());
+    size_t freeHeapBefore = ESP.getFreeHeap();
+    Logger::log("Starting Bluetooth Classic inquiry scan (5s)... Initial free heap: %u bytes", freeHeapBefore);
+
+    if (freeHeapBefore < 25000) {
+        Logger::log("WARNING: Heap memory too low for Bluetooth scan (%u bytes free). Aborting scan.", freeHeapBefore);
         return "[]";
     }
 
-    Logger::log("Starting Bluetooth Classic inquiry scan (5s)... Free heap: %d bytes", ESP.getFreeHeap());
-    
-    // Perform 5-second inquiry scan for Bluetooth Classic devices
+    // Temporarily pause active Bluetooth SPP link to maximize RAM during scan
+    bool wasConnected = SerialBT.connected();
+    if (wasConnected) {
+        Logger::log("Temporarily pausing active Bluetooth SPP link to free ~30KB RAM for inquiry scan...");
+        SerialBT.disconnect();
+        printerConnected = false;
+        delay(100);
+    }
+
     BTScanResults* scanResults = SerialBT.discover(5000);
     String json = "[";
-    
+
     if (scanResults != nullptr) {
         int count = scanResults->getCount();
-        Logger::log("Bluetooth scan finished. Discovered %d devices. Free heap: %d bytes", count, ESP.getFreeHeap());
-        
+        Logger::log("Bluetooth scan finished. Discovered %d devices. Free heap: %u bytes", count, ESP.getFreeHeap());
+
         for (int i = 0; i < count; i++) {
             BTAdvertisedDevice* device = scanResults->getDevice(i);
             if (i > 0) json += ",";
-            
+
             String name = device->getName().c_str();
             if (name.length() == 0) {
                 name = "Unknown Bluetooth Device";
             }
-            
+
             String mac = device->getAddress().toString().c_str();
             int rssi = device->getRSSI();
-            
+
             json += "{";
             json += "\"name\":\"" + name + "\",";
             json += "\"mac\":\"" + mac + "\",";
@@ -124,7 +133,16 @@ String scanBluetoothDevices() {
     } else {
         Logger::log("Bluetooth scan returned no results or failed.");
     }
-    
+
+    // Restore active Bluetooth connection if previously paired
+    if (wasConnected) {
+        Logger::log("Restoring active Bluetooth connection to printer...");
+        if (SerialBT.connect(macAddress)) {
+            printerConnected = true;
+            Logger::log("Reconnected to printer successfully after scan.");
+        }
+    }
+
     json += "]";
     return json;
 }
@@ -155,7 +173,7 @@ bool savePrinterMAC(const String& macStr) {
         SerialBT.disconnect();
     }
     printerConnected = false;
-    
+
     if (SerialBT.connect(macAddress)) {
         Logger::log("Connected to newly configured printer: %s", macStr.c_str());
         printerConnected = true;
