@@ -162,16 +162,52 @@ Sensitivity parameters (SSID, Wi-Fi password, Bluetooth MAC address, default PIN
 
 ---
 
-## Compiling & Flashing
+## Flashing & Upgrade Guide
 
-### Option A: Using GitHub Actions (Precompiled Binary)
-1. Every commit to `main` / `master` triggers the [Build Workflow](.github/workflows/build.yml).
-2. Download the compiled firmware `.bin` artifact from GitHub Actions.
-3. Flash directly using [ESP Web Tools](https://web.esphome.io/) or `esptool.py`.
+Download the latest precompiled release binaries directly from the **[GitHub Releases Page](https://github.com/spelech/esp32-LabelPrinter/releases/latest)**.
 
-### Option B: Using Arduino IDE
-1. Install **Arduino IDE 2.0+**.
-2. Go to *Tools -> Board -> Board Manager* and install **esp32** by Espressif Systems.
-3. Select **ESP32 Dev Module** as board target.
-4. Select *Tools -> Partition Scheme -> Minimal SPIFFS (1.9MB APP / 1.9MB OTA)* (enables full Over-The-Air Wi-Fi firmware updates).
-5. Open `esp32-LabelPrinter.ino` and click **Upload**.
+---
+
+### Scenario 1: Initial Flashing (Fresh Brand-New ESP32 Board over USB)
+
+Use this method when setting up a new ESP32 board for the very first time.
+
+- **File to Download:** `esp32-LabelPrinter.ino.merged.bin` (Complete 4MB full-chip factory image).
+
+#### Method A: Web Browser Installer (Recommended - No Software to Install)
+1. Plug your ESP32 board into your computer using a USB data cable.
+2. Open Chrome or Edge and navigate to **[ESP Web Tools](https://web.esphome.io/)**.
+3. Click **Connect**, select your ESP32's USB/COM port, and click **Install**.
+4. Choose the downloaded `esp32-LabelPrinter.ino.merged.bin` file and click **Install**. 
+5. Flashing completes in ~20 seconds!
+
+#### Method B: Command Line (`esptool.py`)
+```bash
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 esp32-LabelPrinter.ino.merged.bin
+```
+
+---
+
+### Scenario 2: Over-The-Air (OTA) Firmware Update (Wireless Wi-Fi Update)
+
+Use this method to update an existing board without plugging in a USB cable.
+
+- **File to Download:** `esp32-LabelPrinter.ino.bin` (Standard application binary).
+
+1. Open your browser and navigate to `http://nelko-bridge.local` (or `http://192.168.4.1` on Hotspot mode).
+2. Go to the **Wi-Fi & Diagnostics** tab and click **Update Firmware (OTA)**.
+3. Choose the downloaded `esp32-LabelPrinter.ino.bin` file and click **Upload**.
+4. The ESP32 writes the update into its secondary OTA partition slot, verifies the checksum, reboots, and swaps to the new version automatically!
+
+---
+
+### Scenario 3: Compiling from Source Code (Arduino IDE)
+
+Use this method if you want to modify the source code or compile locally.
+
+1. Download or clone this repository to your computer.
+2. Open **Arduino IDE 2.0+**.
+3. Go to *Tools -> Board -> Board Manager* and install **esp32** by Espressif Systems.
+4. Select **ESP32 Dev Module** as target board.
+5. Select **Tools -> Partition Scheme -> Minimal SPIFFS (1.9MB APP / 1.9MB OTA)** (*Required to fit Bluetooth Classic + Wi-Fi and preserve OTA updates*).
+6. Open `esp32-LabelPrinter.ino` and click **Upload**.
