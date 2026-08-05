@@ -79,41 +79,17 @@ const char LOGIN_HTML[] PROGMEM = R"raw(
             transition: opacity 0.2s;
         }
         button:hover { opacity: 0.9; }
-        .error { color: #ef4444; font-size: 0.8rem; margin-top: 12px; display: none; }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h1>Nelko Print Bridge</h1>
-        <p>Enter 24-Hour Portal PIN to Access</p>
-        <form onsubmit="handleLogin(event)">
-            <input type="password" id="pin-input" placeholder="••••" maxlength="8" required autofocus>
+        <p>Enter Portal PIN to Access</p>
+        <form action="/api/auth/login" method="POST">
+            <input type="password" name="pin" placeholder="••••" maxlength="8" required autofocus>
             <button type="submit">Authenticate Session</button>
-            <div id="error-msg" class="error">Invalid PIN Passcode</div>
         </form>
     </div>
-    <script>
-        function handleLogin(e) {
-            e.preventDefault();
-            const pin = document.getElementById('pin-input').value;
-            fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'pin=' + encodeURIComponent(pin)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.href = '/';
-                } else {
-                    document.getElementById('error-msg').style.display = 'block';
-                }
-            })
-            .catch(() => {
-                document.getElementById('error-msg').style.display = 'block';
-            });
-        }
-    </script>
 </body>
 </html>
 )raw";
@@ -156,7 +132,7 @@ const char APP_HTML[] PROGMEM = R"raw(
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.2</span></h1>
+            <h1>Nelko P21 Wireless Bridge <span style="font-size:0.75rem; font-weight:500; color:#94a3b8; margin-left:6px; background:#1e293b; padding:2px 8px; border-radius:6px;">v1.1.3</span></h1>
             <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
         </div>
 
@@ -343,6 +319,9 @@ const char APP_HTML[] PROGMEM = R"raw(
 )raw";
 
 static bool checkAuth() {
+#if defined(ENABLE_PIN_AUTH) && (ENABLE_PIN_AUTH == false)
+    return true; // PIN authentication disabled in config
+#else
     String cookie = webServer.header("Cookie");
     if (isSessionValid(cookie)) {
         return true;
@@ -350,6 +329,7 @@ static bool checkAuth() {
     webServer.sendHeader("Location", "/login");
     webServer.send(302, "text/plain", "Redirecting to portal login...");
     return false;
+#endif
 }
 
 void handleLoginRoute() {
@@ -357,16 +337,21 @@ void handleLoginRoute() {
 }
 
 void handleAuthLoginApi() {
+    String pin = "";
     if (webServer.hasArg("pin")) {
-        String pin = webServer.arg("pin");
-        if (validatePIN(pin)) {
-            String token = createSession();
-            webServer.sendHeader("Set-Cookie", "nelko_session=" + token + "; Max-Age=86400; Path=/");
-            webServer.send(200, "application/json", "{\"success\":true}");
-            return;
-        }
+        pin = webServer.arg("pin");
     }
-    webServer.send(401, "application/json", "{\"success\":false,\"error\":\"Invalid PIN\"}");
+
+    if (validatePIN(pin)) {
+        String token = createSession();
+        webServer.sendHeader("Set-Cookie", "nelko_session=" + token + "; Max-Age=86400; Path=/");
+        webServer.sendHeader("Location", "/", true);
+        webServer.send(302, "text/plain", "Authenticated successfully.");
+        return;
+    }
+
+    webServer.sendHeader("Location", "/login", true);
+    webServer.send(302, "text/plain", "Invalid PIN");
 }
 
 void handleRootRoute() {
@@ -416,7 +401,7 @@ void handlePrintApi() {
     if (!checkAuth()) return;
     if (webServer.hasArg("plain")) {
         String body = webServer.arg("plain");
-        
+
         SimpleLabelRequest req;
         if (body.indexOf("main_text") != -1) {
             int idx = body.indexOf("\"main_text\"");
@@ -477,7 +462,7 @@ void initWebServer() {
 
     webServer.on("/", handleRootRoute);
     webServer.on("/login", handleLoginRoute);
-    webServer.on("/api/auth/login", HTTP_POST, handleAuthLoginApi);
+    webServer.on("/api/auth/login", handleAuthLoginApi);
     webServer.on("/api/wifi/scan", HTTP_GET, handleScanApi);
     webServer.on("/api/wifi/save", HTTP_POST, handleSaveApi);
     webServer.on("/api/bt/scan", HTTP_GET, handleBtScanApi);

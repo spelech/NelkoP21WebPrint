@@ -35,8 +35,12 @@
 #define DEFAULT_PORTAL_PIN "1234"
 #endif
 
+#ifndef ENABLE_PIN_AUTH
+#define ENABLE_PIN_AUTH true  // Set to false to disable PIN prompt entirely
+#endif
+
 #ifndef APP_VERSION
-#define APP_VERSION "1.1.2"
+#define APP_VERSION "1.1.3"
 #endif
 
 #endif
