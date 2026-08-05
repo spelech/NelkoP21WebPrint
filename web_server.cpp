@@ -2,308 +2,439 @@
 #include "config.h"
 #include "logger.h"
 #include "printer_spp.h"
+#include "wifi_manager.h"
+#include "tspl_generator.h"
 #include <WiFi.h>
 
 WebServer webServer(WEB_SERVER_PORT);
 WiFiServer logServer(8080);
 
-const char INDEX_HTML[] PROGMEM = R"raw(
+const char LOGIN_HTML[] PROGMEM = R"raw(
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nelko P21 Print Bridge</title>
+    <title>Nelko Bridge - Portal Login</title>
     <style>
         body {
             background-color: #020617;
             color: #f1f5f9;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 800px;
-        }
-        .header {
+            padding: 0;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            border-bottom: 1px solid #1e293b;
-            padding-bottom: 16px;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .login-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid #1e293b;
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
         }
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 700;
-            margin: 0;
+            margin-top: 0;
+            margin-bottom: 8px;
             background: linear-gradient(to right, #6366f1, #a855f7);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .card {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid #1e293b;
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-        }
-        .card-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+        p {
             color: #94a3b8;
-            margin-top: 0;
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background: #090d16;
+            color: #ffffff;
+            font-size: 1.25rem;
+            text-align: center;
+            letter-spacing: 0.25em;
+            box-sizing: border-box;
             margin-bottom: 16px;
         }
-        .grid {
-            display: grid;
-            grid-template-cols: 1fr;
-            gap: 16px;
-        }
-        @media (min-width: 640px) {
-            .grid {
-                grid-template-cols: 1fr 1fr;
-            }
-        }
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #1e293b;
-        }
-        .status-item:last-child {
-            border-bottom: none;
-        }
-        .label {
-            color: #94a3b8;
-            font-size: 0.875rem;
-        }
-        .value {
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .badge-success {
-            background-color: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        .badge-danger {
-            background-color: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-        .terminal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .terminal-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #94a3b8;
-        }
-        .btn {
-            background-color: #1e293b;
-            color: #f1f5f9;
-            border: 1px solid #334155;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn:hover {
-            background-color: #334155;
-        }
-        .terminal {
-            background-color: #090d16;
-            border: 1px solid #1e293b;
+        button {
+            width: 100%;
+            padding: 12px;
             border-radius: 12px;
-            padding: 16px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 0.8125rem;
-            color: #38bdf8;
-            height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            border: none;
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
         }
+        button:hover { opacity: 0.9; }
+        .error { color: #ef4444; font-size: 0.8rem; margin-top: 12px; display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Nelko P21 Print Bridge</h1>
-            <div id="connection-indicator" class="badge badge-danger">Offline</div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Device Configuration</div>
-            <div class="grid">
-                <div>
-                    <div class="status-item">
-                        <span class="label">Wi-Fi IP</span>
-                        <span class="value" id="wifi-ip">Connecting...</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">Signal Strength (RSSI)</span>
-                        <span class="value" id="wifi-rssi">- dBm</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">mDNS Hostname</span>
-                        <span class="value">nelko-bridge.local</span>
-                    </div>
-                </div>
-                <div>
-                    <div class="status-item">
-                        <span class="label">Bluetooth Status</span>
-                        <span class="value" id="bt-status">Disconnected</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">TCP Print Port</span>
-                        <span class="value">9100</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">Log Web Clients</span>
-                        <span class="value" id="log-clients">0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="terminal-header">
-                <span class="terminal-title">Live Debug Diagnostics</span>
-                <button class="btn" onclick="clearLogs()">Clear Console</button>
-            </div>
-            <div class="terminal" id="log-console">Initializing bridge diagnostic logs...
-</div>
-        </div>
+    <div class="login-card">
+        <h1>Nelko Print Bridge</h1>
+        <p>Enter 24-Hour Portal PIN to Access</p>
+        <form onsubmit="handleLogin(event)">
+            <input type="password" id="pin-input" placeholder="••••" maxlength="8" required autofocus>
+            <button type="submit">Authenticate Session</button>
+            <div id="error-msg" class="error">Invalid PIN Passcode</div>
+        </form>
     </div>
-
     <script>
-        const logConsole = document.getElementById('log-console');
-        let sseSource = null;
-
-        function clearLogs() {
-            logConsole.textContent = '';
+        function handleLogin(e) {
+            e.preventDefault();
+            const pin = document.getElementById('pin-input').value;
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'pin=' + encodeURIComponent(pin)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/';
+                } else {
+                    document.getElementById('error-msg').style.display = 'block';
+                }
+            })
+            .catch(() => {
+                document.getElementById('error-msg').style.display = 'block';
+            });
         }
-
-        function appendLog(message) {
-            const date = new Date();
-            const timeStr = date.toTimeString().split(' ')[0];
-            logConsole.textContent += `[${timeStr}] ${message}\n`;
-            logConsole.scrollTop = logConsole.scrollHeight;
-        }
-
-        function fetchStats() {
-            fetch('/stats')
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('wifi-ip').textContent = data.ip;
-                    document.getElementById('wifi-rssi').textContent = `${data.rssi} dBm`;
-                    
-                    const btStatus = document.getElementById('bt-status');
-                    const indicator = document.getElementById('connection-indicator');
-                    
-                    if (data.bt_connected) {
-                        btStatus.textContent = "Connected";
-                        btStatus.className = "value";
-                        indicator.textContent = "Ready";
-                        indicator.className = "badge badge-success";
-                    } else {
-                        btStatus.textContent = "Searching...";
-                        btStatus.className = "value badge-danger";
-                        indicator.textContent = "Offline";
-                        indicator.className = "badge badge-danger";
-                    }
-                    
-                    document.getElementById('log-clients').textContent = data.log_clients;
-                })
-                .catch(err => {
-                    console.error('Failed to fetch diagnostics:', err);
-                });
-        }
-
-        function initLogs() {
-            if (sseSource) {
-                sseSource.close();
-            }
-            
-            // Connect to Port 8080 for SSE Log Stream
-            sseSource = new EventSource(`http://${window.location.hostname}:8080/logs`);
-            
-            sseSource.onopen = () => {
-                appendLog("ESTABLISHED diagnostics log stream connection.");
-            };
-            
-            sseSource.onmessage = (event) => {
-                appendLog(event.data);
-            };
-            
-            sseSource.onerror = (err) => {
-                appendLog("DISCONNECTED from log stream. Attempting auto-reconnect...");
-            };
-        }
-
-        // Initialize
-        fetchStats();
-        initLogs();
-        setInterval(fetchStats, 3000);
     </script>
 </body>
 </html>
 )raw";
 
-void handleRoot() {
-    webServer.send(200, "text/html", INDEX_HTML);
+const char APP_HTML[] PROGMEM = R"raw(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nelko P21 Bridge & Designer</title>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+        .container { width: 100%; max-width: 760px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 12px; }
+        h1 { font-size: 1.35rem; margin: 0; background: linear-gradient(to right, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-tabs { display: grid; grid-template-cols: 1fr 1fr; gap: 8px; margin-bottom: 20px; background: #0f172a; padding: 4px; border-radius: 12px; border: 1px solid #1e293b; }
+        .tab-btn { padding: 10px; border: none; background: transparent; color: #94a3b8; font-weight: 600; font-size: 0.85rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background: #312e81; color: #ffffff; }
+        .card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid #1e293b; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #334155; background: #090d16; color: #ffffff; font-size: 0.9rem; box-sizing: border-box; }
+        input[type="range"] { width: 100%; accent-color: #6366f1; }
+        .btn-primary { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+        .terminal { background-color: #090d16; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; font-family: monospace; font-size: 0.8rem; color: #38bdf8; height: 220px; overflow-y: auto; white-space: pre-wrap; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 12px; background: #10b981; color: white; font-weight: 600; font-size: 0.85rem; display: none; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Nelko P21 Wireless Bridge</h1>
+            <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="btn-designer" onclick="showTab('designer')">Standalone Designer</button>
+            <button class="tab-btn" id="btn-config" onclick="showTab('config')">Wi-Fi & Diagnostics</button>
+        </div>
+
+        <!-- TAB 1: Designer -->
+        <div id="tab-designer">
+            <div class="card">
+                <div class="form-group">
+                    <label>Label Size Preset</label>
+                    <select id="preset-size">
+                        <option value="14x40">14mm x 40mm (Standard)</option>
+                        <option value="14x30">14mm x 30mm (Short)</option>
+                        <option value="12x40">12mm x 40mm (Slim)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Main Text</label>
+                    <input type="text" id="main-text" placeholder="Sample Text" value="Nelko P21">
+                </div>
+                <div class="form-group">
+                    <label>Subtitle / Secondary Text</label>
+                    <input type="text" id="sub-text" placeholder="Optional Subtitle" value="Item #1042">
+                </div>
+                <div class="form-group">
+                    <label>Code128 Barcode Data</label>
+                    <input type="text" id="barcode-data" placeholder="1042598" value="1042598">
+                </div>
+                <div class="form-group">
+                    <label>Border Thickness (<span id="border-val">2</span>px)</label>
+                    <input type="range" id="border-range" min="0" max="6" value="2" oninput="document.getElementById('border-val').textContent=this.value">
+                </div>
+                <button class="btn-primary" onclick="printLabel()">Print Label Direct</button>
+            </div>
+        </div>
+
+        <!-- TAB 2: Config & Diagnostics -->
+        <div id="tab-config" style="display:none;">
+            <div class="card">
+                <div class="form-group">
+                    <label>Scan Nearby Wi-Fi Networks</label>
+                    <button class="btn-primary" style="background:#334155; margin-bottom:10px;" onclick="scanWifi()">Scan Networks</button>
+                    <select id="wifi-select"><option value="">Select a network...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Wi-Fi Password</label>
+                    <input type="password" id="wifi-pass" placeholder="Network Password">
+                </div>
+                <button class="btn-primary" onclick="saveWifi()">Save Credentials & Reconnect</button>
+            </div>
+
+            <div class="card">
+                <div style="font-size:0.85rem; font-weight:600; color:#94a3b8; margin-bottom:10px;">Live SSE Log Console</div>
+                <div class="terminal" id="log-console">Log stream initializing...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">Label sent to printer!</div>
+
+    <script>
+        function showTab(tab) {
+            document.getElementById('btn-designer').classList.remove('active');
+            document.getElementById('btn-config').classList.remove('active');
+            if (tab === 'designer') {
+                document.getElementById('tab-designer').style.display = 'block';
+                document.getElementById('tab-config').style.display = 'none';
+                document.getElementById('btn-designer').classList.add('active');
+            } else {
+                document.getElementById('tab-designer').style.display = 'none';
+                document.getElementById('tab-config').style.display = 'block';
+                document.getElementById('btn-config').classList.add('active');
+            }
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
+
+        function printLabel() {
+            const size = document.getElementById('preset-size').value.split('x');
+            const payload = {
+                width_mm: parseFloat(size[0]),
+                height_mm: parseFloat(size[1]),
+                main_text: document.getElementById('main-text').value,
+                subtitle: document.getElementById('sub-text').value,
+                barcode_data: document.getElementById('barcode-data').value,
+                border_thickness: parseInt(document.getElementById('border-range').value)
+            };
+
+            fetch('/api/print', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => { showToast('Printed label successfully!'); })
+            .catch(err => { showToast('Print error!'); });
+        }
+
+        function scanWifi() {
+            fetch('/api/wifi/scan')
+                .then(res => res.json())
+                .then(nets => {
+                    const sel = document.getElementById('wifi-select');
+                    sel.innerHTML = '<option value="">Select a network...</option>';
+                    nets.forEach(n => {
+                        const opt = document.createElement('option');
+                        opt.value = n.ssid;
+                        opt.textContent = `${n.ssid} (${n.rssi} dBm)`;
+                        sel.appendChild(opt);
+                    });
+                });
+        }
+
+        function saveWifi() {
+            const ssid = document.getElementById('wifi-select').value;
+            const pass = document.getElementById('wifi-pass').value;
+            fetch('/api/wifi/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`
+            })
+            .then(() => { showToast('Saved! Reconnecting device...'); });
+        }
+
+        // Live Log Stream
+        const sse = new EventSource(`http://${window.location.hostname}:8080/logs`);
+        sse.onmessage = (e) => {
+            const consoleEl = document.getElementById('log-console');
+            consoleEl.textContent += e.data + '\n';
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        };
+    </script>
+</body>
+</html>
+)raw";
+
+static bool checkAuth() {
+    String cookie = webServer.header("Cookie");
+    if (isSessionValid(cookie)) {
+        return true;
+    }
+    webServer.sendHeader("Location", "/login");
+    webServer.send(302, "text/plain", "Redirecting to portal login...");
+    return false;
 }
 
-void handleStats() {
-    String json = "{";
-    json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-    json += "\"bt_connected\":" + String(isPrinterConnected() ? "true" : "false") + ",";
-    json += "\"log_clients\":" + String(Logger::getClientCount()) + ",";
-    json += "\"heap\":" + String(ESP.getFreeHeap()) + ",";
-    json += "\"uptime\":" + String(millis() / 1000);
-    json += "}";
-    
+void handleLoginRoute() {
+    webServer.send(200, "text/html", LOGIN_HTML);
+}
+
+void handleAuthLoginApi() {
+    if (webServer.hasArg("pin")) {
+        String pin = webServer.arg("pin");
+        if (validatePIN(pin)) {
+            String token = createSession();
+            // Set 24h session cookie
+            webServer.sendHeader("Set-Cookie", "nelko_session=" + token + "; Max-Age=86400; Path=/");
+            webServer.send(200, "application/json", "{\"success\":true}");
+            return;
+        }
+    }
+    webServer.send(401, "application/json", "{\"success\":false,\"error\":\"Invalid PIN\"}");
+}
+
+void handleRootRoute() {
+    if (!checkAuth()) return;
+    webServer.send(200, "text/html", APP_HTML);
+}
+
+void handleScanApi() {
+    if (!checkAuth()) return;
+    String json = scanWiFiNetworks();
     webServer.send(200, "application/json", json);
 }
 
+void handleSaveApi() {
+    if (!checkAuth()) return;
+    if (webServer.hasArg("ssid")) {
+        String ssid = webServer.arg("ssid");
+        String pass = webServer.hasArg("pass") ? webServer.arg("pass") : "";
+        saveWiFiCredentials(ssid, pass);
+        webServer.send(200, "application/json", "{\"status\":\"ok\"}");
+        delay(1000);
+        ESP.restart();
+        return;
+    }
+    webServer.send(400, "application/json", "{\"error\":\"Missing SSID\"}");
+}
+
+void handlePrintApi() {
+    if (!checkAuth()) return;
+    if (webServer.hasArg("plain")) {
+        String body = webServer.arg("plain");
+        
+        SimpleLabelRequest req;
+        // Simple manual parsing of POST parameters
+        if (body.indexOf("main_text") != -1) {
+            int idx = body.indexOf("\"main_text\"");
+            int startQuote = body.indexOf('"', idx + 11);
+            int endQuote = body.indexOf('"', startQuote + 1);
+            if (startQuote != -1 && endQuote != -1) {
+                req.mainText = body.substring(startQuote + 1, endQuote);
+            }
+        }
+        if (body.indexOf("subtitle") != -1) {
+            int idx = body.indexOf("\"subtitle\"");
+            int startQuote = body.indexOf('"', idx + 10);
+            int endQuote = body.indexOf('"', startQuote + 1);
+            if (startQuote != -1 && endQuote != -1) {
+                req.subtitle = body.substring(startQuote + 1, endQuote);
+            }
+        }
+        if (body.indexOf("barcode_data") != -1) {
+            int idx = body.indexOf("\"barcode_data\"");
+            int startQuote = body.indexOf('"', idx + 14);
+            int endQuote = body.indexOf('"', startQuote + 1);
+            if (startQuote != -1 && endQuote != -1) {
+                req.barcodeData = body.substring(startQuote + 1, endQuote);
+            }
+        }
+
+        String tsplPayload = generateTSPLStream(req);
+        if (isPrinterConnected()) {
+            SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
+            Logger::log("Direct API Print: Sent %d bytes of TSPL to printer.", tsplPayload.length());
+            webServer.send(200, "application/json", "{\"status\":\"success\"}");
+        } else {
+            Logger::log("Direct API Print error: Printer is offline.");
+            webServer.send(503, "application/json", "{\"error\":\"Printer offline\"}");
+        }
+        return;
+    }
+    webServer.send(400, "application/json", "{\"error\":\"Invalid payload\"}");
+}
+
+// Strict Captive Portal Redirection
+void handleNotFound() {
+    if (isSoftAP()) {
+        webServer.sendHeader("Location", "http://192.168.4.1/login", true);
+        webServer.send(302, "text/plain", "");
+    } else {
+        webServer.send(404, "text/plain", "Not Found");
+    }
+}
+
 void initWebServer() {
-    webServer.on("/", handleRoot);
-    webServer.on("/stats", handleStats);
+    const char* headerKeys[] = {"Cookie"};
+    webServer.collectHeaders(headerKeys, 1);
+
+    webServer.on("/", handleRootRoute);
+    webServer.on("/login", handleLoginRoute);
+    webServer.on("/api/auth/login", HTTP_POST, handleAuthLoginApi);
+    webServer.on("/api/wifi/scan", HTTP_GET, handleScanApi);
+    webServer.on("/api/wifi/save", HTTP_POST, handleSaveApi);
+    webServer.on("/api/print", HTTP_POST, handlePrintApi);
+
+    // Captive Portal Detection Handlers
+    webServer.on("/generate_204", handleNotFound);
+    webServer.on("/fwlink", handleNotFound);
+    webServer.on("/hotspot-detect.html", handleNotFound);
+    webServer.onNotFound(handleNotFound);
+
     webServer.begin();
     logServer.begin();
-    Logger::log("Web diagnostic server started on port %d.", WEB_SERVER_PORT);
-    Logger::log("Web log stream server started on port 8080.");
+    Logger::log("Embedded Label Designer & Captive Portal started on port %d.", WEB_SERVER_PORT);
 }
 
 void handleWebServer() {
     webServer.handleClient();
-    
-    // Accept clients on the 8080 TCP server for logs
+
     WiFiClient client = logServer.available();
     if (client) {
-        // Read headers first to clear input buffer before handshaking SSE
         while (client.available()) {
             client.read();
         }
