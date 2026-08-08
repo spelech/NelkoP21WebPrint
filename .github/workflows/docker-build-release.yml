@@ -90,6 +90,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve Version Name
+        id: version_resolver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_NAME="${{ github.ref_name }}"
+          else
+            VERSION_NAME=$(git describe --tags --abbrev=0 2>/dev/null || echo "3.0.0")
+          fi
+          VERSION_NAME="${VERSION_NAME#v}"
+          echo "resolved_version=${VERSION_NAME}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -122,6 +133,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ steps.meta.outputs.version }}
+            APP_VERSION=${{ steps.version_resolver.outputs.resolved_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
