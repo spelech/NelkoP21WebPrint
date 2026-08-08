@@ -5,7 +5,7 @@ import Header, { HeaderProps } from '../Header';
 
 describe('Header Component', () => {
   const defaultProps: HeaderProps = {
-    appVersion: '2.2.0',
+    appVersion: '3.0.0',
     historyIndex: 0,
     history: [[]],
     handleUndo: vi.fn(),
@@ -25,7 +25,7 @@ describe('Header Component', () => {
   it('renders app title and version badge', () => {
     render(<Header {...defaultProps} />);
     expect(screen.getByText('P21 Studio')).toBeDefined();
-    expect(screen.getByText('v2.2.0')).toBeDefined();
+    expect(screen.getByText('v3.0.0')).toBeDefined();
   });
 
   it('handles undo/redo button states and clicks correctly', () => {
