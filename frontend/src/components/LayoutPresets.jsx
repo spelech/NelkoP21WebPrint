@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, ChevronDown, RotateCw } from 'lucide-react';
+import { Grid, ChevronDown, RotateCw, Wifi } from 'lucide-react';
 import ThemeSelector from './ThemeSelector';
 
 export default function LayoutPresets({
@@ -18,6 +18,7 @@ export default function LayoutPresets({
   layoutFileInputRef,
   handleImportLayout,
   handleClearCanvas,
+  handlePushToEsp32,
   snapToGrid,
   setSnapToGrid,
   showGrid,
@@ -144,36 +145,47 @@ export default function LayoutPresets({
             </div>
           )}
 
-          {/* Layout Action Buttons (Export, Import, Clear) */}
-          <div className="flex gap-2">
-            <button 
-              onClick={handleExportLayout}
-              className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
-              title="Export current canvas layout as JSON file"
+          {/* Layout Action Buttons (Export, Import, Clear, Push to ESP32) */}
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button 
+                onClick={handleExportLayout}
+                className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+                title="Export current canvas layout as JSON file"
+              >
+                Export
+              </button>
+              <button 
+                onClick={() => layoutFileInputRef.current?.click()}
+                className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
+                title="Import a previously saved canvas layout JSON"
+              >
+                Import
+              </button>
+              <button 
+                onClick={handleClearCanvas}
+                className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition text-center"
+                title="Clear all elements from canvas to start fresh"
+              >
+                Clear
+              </button>
+              <input 
+                type="file" 
+                ref={layoutFileInputRef} 
+                onChange={handleImportLayout} 
+                accept=".json" 
+                className="hidden" 
+              />
+            </div>
+
+            <button
+              onClick={handlePushToEsp32}
+              className="w-full py-2 px-3 rounded-xl border border-indigo-500/30 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm"
+              title="Push current layout template directly to ESP32 Bridge over Wi-Fi"
             >
-              Export
+              <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Push to ESP32 Bridge</span>
             </button>
-            <button 
-              onClick={() => layoutFileInputRef.current?.click()}
-              className="flex-1 py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-350 hover:text-slate-200 transition text-center"
-              title="Import a previously saved canvas layout JSON"
-            >
-              Import
-            </button>
-            <button 
-              onClick={handleClearCanvas}
-              className="flex-1 py-1.5 px-2 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-[10px] font-semibold text-rose-400 hover:text-rose-300 transition text-center"
-              title="Clear all elements from canvas to start fresh"
-            >
-              Clear
-            </button>
-            <input 
-              type="file" 
-              ref={layoutFileInputRef} 
-              onChange={handleImportLayout} 
-              accept=".json" 
-              className="hidden" 
-            />
           </div>
 
           {/* Layout Parameters - Snap to Grid & Show Grid Toggles */}

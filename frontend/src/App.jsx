@@ -837,6 +837,27 @@ export default function App() {
     }
   };
 
+  const handlePushToEsp32 = async () => {
+    const target = window.prompt("Enter ESP32 IP or Hostname (e.g. 192.168.4.1 or nelko-bridge.local):", "192.168.4.1");
+    if (!target) return;
+    const cleanTarget = target.trim().replace(/^https?:\/\//, '');
+    try {
+      const res = await fetch(`http://${cleanTarget}/api/template/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset: selectedPreset, elements })
+      });
+      if (res.ok) {
+        setPrintStatus({ type: 'success', msg: 'Successfully pushed layout template to ESP32 bridge!' });
+      } else {
+        const errText = await res.text();
+        setPrintStatus({ type: 'error', msg: `ESP32 Push Error: ${errText || res.statusText}` });
+      }
+    } catch (err) {
+      setPrintStatus({ type: 'error', msg: `Failed to push template to ESP32: ${err.message}` });
+    }
+  };
+
   const updateSelectedElement = (key, val) => {
     setElements(elements.map(el => el.id === selectedId ? { ...el, [key]: val } : el));
   };
@@ -1519,6 +1540,7 @@ export default function App() {
           layoutFileInputRef={layoutFileInputRef}
           handleImportLayout={handleImportLayout}
           handleClearCanvas={handleClearCanvas}
+          handlePushToEsp32={handlePushToEsp32}
           snapToGrid={snapToGrid}
           setSnapToGrid={setSnapToGrid}
           showGrid={showGrid}
