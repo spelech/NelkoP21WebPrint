@@ -40,6 +40,11 @@ import { browserBtDriver } from './utils/webBluetoothDriver';
 import QRCode from 'qrcode';
 import { convertCanvasToTsplBytes } from './utils/tsplGenerator';
 import { MDI_OFFLINE } from './utils/mdiIcons';
+import { parseCSV, getTemplateVariables } from './utils/csvParser';
+import { useHistory } from './hooks/useHistory';
+import { useCanvasDrag } from './hooks/useCanvasDrag';
+import { useIconSearch } from './hooks/useIconSearch';
+import ElementInspector from './components/Inspector/ElementInspector';
 import ThemeSelector from './components/ThemeSelector';
 import SettingsModal from './components/Modals/SettingsModal';
 import WizardModal from './components/Modals/WizardModal';
@@ -70,29 +75,29 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
   const [isPortraitView, setIsPortraitView] = useState(false); // Default to Landscape view
 
-  // Label Elements
-  const [elements, setElements] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
+  // Undo / Redo History Stack Hook
+  const {
+    elements,
+    setElements,
+    history,
+    setHistory,
+    historyIndex,
+    setHistoryIndex,
+    elementsRef,
+    pushHistory,
+    handleUndo,
+    handleRedo,
+  } = useHistory([]);
 
   // Snap-to-Grid & Alignment Guides State
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
-  const [alignmentGuides, setAlignmentGuides] = useState([]);
 
   // Collapsable Sidebar Sections State
   const [collapsedPresets, setCollapsedPresets] = useState(false);
   const [collapsedAddElements, setCollapsedAddElements] = useState(false);
   const [collapsedIcons, setCollapsedIcons] = useState(false);
   const [collapsedPrintParams, setCollapsedPrintParams] = useState(false);
-
-  // Undo / Redo History Stack
-  const [history, setHistory] = useState([[]]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const elementsRef = useRef(elements);
-
-  useEffect(() => {
-    elementsRef.current = elements;
-  }, [elements]);
 
   // Workspace Theme State
   const [theme, setTheme] = useState(() => localStorage.getItem('nelko_theme') || 'slate');
@@ -105,34 +110,6 @@ export default function App() {
       body.classList.add(`theme-${theme}`);
     }
   }, [theme]);
-
-  const snapToGridRef = useRef(snapToGrid);
-  useEffect(() => {
-    snapToGridRef.current = snapToGrid;
-  }, [snapToGrid]);
-
-  const pushHistory = (newElements) => {
-    const nextHistory = history.slice(0, historyIndex + 1);
-    nextHistory.push(newElements);
-    setHistory(nextHistory);
-    setHistoryIndex(nextHistory.length - 1);
-  };
-
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const prevIndex = historyIndex - 1;
-      setHistoryIndex(prevIndex);
-      setElements(history[prevIndex]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextIndex = historyIndex + 1;
-      setHistoryIndex(nextIndex);
-      setElements(history[nextIndex]);
-    }
-  };
 
   // Local Storage Auto-Save
   useEffect(() => {
@@ -172,86 +149,18 @@ export default function App() {
   // Mobile panel tab: 'canvas' | 'add' | 'inspector' | 'print'
   const [mobilePanelTab, setMobilePanelTab] = useState('canvas');
 
-  // MDI Icons Search State & Debouncing
-  const [iconSearch, setIconSearch] = useState('');
-  const [iconResults, setIconResults] = useState([]);
-  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
-  const searchAbortControllerRef = useRef(null);
-
-  useEffect(() => {
-    if (!iconSearch) {
-      setIconResults([]);
-      setIsSearchingIcons(false);
-      return;
-    }
-
-    setIsSearchingIcons(true);
-
-    const delayDebounceFn = setTimeout(async () => {
-      // Cancel previous search fetch
-      if (searchAbortControllerRef.current) {
-        searchAbortControllerRef.current.abort();
-      }
-
-      const controller = new AbortController();
-      searchAbortControllerRef.current = controller;
-
-      // 1. Search local offline curated catalog first
-      const matches = [];
-      Object.entries(MDI_OFFLINE).forEach(([cat, icons]) => {
-        icons.forEach(ic => {
-          if (ic.name.toLowerCase().includes(iconSearch.toLowerCase())) {
-            matches.push({ ...ic, source: 'offline' });
-          }
-        });
-      });
-      setIconResults(matches);
-
-      // 2. Fetch online mdi catalog via Iconify
-      if (navigator.onLine) {
-        try {
-          const res = await fetch(
-            `https://api.iconify.design/search?query=${encodeURIComponent(iconSearch)}&prefix=mdi`,
-            { signal: controller.signal }
-          );
-          const data = await res.json();
-          if (data.icons && data.icons.length > 0) {
-            const webMatches = [];
-            for (let i = 0; i < Math.min(data.icons.length, 12); i++) {
-              const fullName = data.icons[i];
-              const cleanName = fullName.replace('mdi:', '');
-              if (!matches.some(m => m.name === cleanName)) {
-                webMatches.push({ name: cleanName, source: 'online' });
-              }
-            }
-            if (!controller.signal.aborted) {
-              setIconResults(prev => [...prev, ...webMatches]);
-            }
-          }
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            console.warn("Iconify lookup failed:", err);
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setIsSearchingIcons(false);
-          }
-        }
-      } else {
-        setIsSearchingIcons(false);
-      }
-    }, 300);
-
-    return () => {
-      clearTimeout(delayDebounceFn);
-    };
-  }, [iconSearch]);
+  // MDI Icons Search Custom Hook
+  const {
+    iconSearch,
+    setIconSearch,
+    iconResults,
+    isSearchingIcons,
+  } = useIconSearch();
 
   const handleSelectWebIcon = async (iconName) => {
     try {
       const res = await fetch(`https://api.iconify.design/mdi/${iconName}.svg`);
       const svgText = await res.text();
-      // Extract path element regex
       const pathMatch = svgText.match(/d="([^"]+)"/);
       if (pathMatch && pathMatch[1]) {
         addIconElement(iconName, pathMatch[1]);
@@ -276,68 +185,39 @@ export default function App() {
   const csvFileInputRef = useRef(null);
   const layoutFileInputRef = useRef(null);
 
-  // Helper: robust CSV string scanner
-  const parseCSV = (text) => {
-    const lines = text.split(/\r?\n/);
-    if (lines.length === 0) return { headers: [], rows: [] };
-    
-    const parseLine = (line) => {
-      const result = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"' || char === "'") {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      result.push(current.trim());
-      return result;
-    };
+  // Active Width & Height based on Portrait / Landscape toggle
+  const activeWidthMm = isPortraitView ? selectedPreset.height : selectedPreset.width;
+  const activeHeightMm = isPortraitView ? selectedPreset.width : selectedPreset.height;
 
-    const cleanLines = lines.map(line => line.trim()).filter(line => line.length > 0);
-    if (cleanLines.length === 0) return { headers: [], rows: [] };
+  // Calculate 203 DPI Canvas px size
+  const dpi = 203;
+  const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
+  const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
 
-    const headers = parseLine(cleanLines[0]);
-    const rows = [];
-    for (let i = 1; i < cleanLines.length; i++) {
-      const values = parseLine(cleanLines[i]);
-      if (values.length >= headers.length) {
-        const row = {};
-        headers.forEach((h, index) => {
-          row[h] = values[index] || '';
-        });
-        rows.push(row);
-      }
-    }
-    return { headers, rows };
-  };
-
-  // Helper: scan elements for double curly braces template variables
-  const getTemplateVariables = () => {
-    const vars = new Set();
-    elements.forEach(el => {
-      if (el.type === 'text' || el.type === 'qr') {
-        const matches = (el.content || '').match(/\{\{([^}]+)\}\}/g);
-        if (matches) {
-          matches.forEach(m => {
-            vars.add(m.slice(2, -2).trim());
-          });
-        }
-      }
-    });
-    return Array.from(vars);
-  };
-
-  // Dragging state & refs
+  // Canvas Dragging & Keyboard Controls Custom Hook
   const containerRef = useRef(null);
-  const [draggingId, setDraggingId] = useState(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  const {
+    selectedId,
+    setSelectedId,
+    draggingId,
+    setDraggingId,
+    alignmentGuides,
+    handleStartDrag,
+    nudgeSelectedElement,
+    deleteSelectedElement,
+  } = useCanvasDrag({
+    elements,
+    elementsRef,
+    setElements,
+    pushHistory,
+    snapToGrid,
+    canvasWidthPx,
+    canvasHeightPx,
+    containerRef,
+    handleUndo,
+    handleRedo,
+  });
 
   // Print & Driver State
   const [appVersion, setAppVersion] = useState('1.1.0');
@@ -348,7 +228,6 @@ export default function App() {
   
   const [showWizardModal, setShowWizardModal] = useState(false);
   const [wizardTab, setWizardTab] = useState('pc');
-  const [showHelpAccordion, setShowHelpAccordion] = useState(false);
   
   const [density, setDensity] = useState(3);
   const [copies, setCopies] = useState(1);
@@ -407,194 +286,6 @@ export default function App() {
   });
 
   const selectedElement = elements.find(el => el.id === selectedId);
-
-  // Active Width & Height based on Portrait / Landscape toggle
-  const activeWidthMm = isPortraitView ? selectedPreset.height : selectedPreset.width;
-  const activeHeightMm = isPortraitView ? selectedPreset.width : selectedPreset.height;
-
-  // Calculate 203 DPI Canvas px size
-  const dpi = 203;
-  const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
-  const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
-
-  const canvasWidthPxRef = useRef(canvasWidthPx);
-  const canvasHeightPxRef = useRef(canvasHeightPx);
-  useEffect(() => {
-    canvasWidthPxRef.current = canvasWidthPx;
-    canvasHeightPxRef.current = canvasHeightPx;
-  }, [canvasWidthPx, canvasHeightPx]);
-
-  // Drag Event Handlers
-  const handleStartDrag = (e, id) => {
-    e.stopPropagation();
-    if (!containerRef.current) return;
-
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const cursorX = ((clientX - rect.left) / rect.width) * 100;
-    const cursorY = ((clientY - rect.top) / rect.height) * 100;
-
-    const el = elements.find(item => item.id === id);
-    if (el) {
-      dragOffsetRef.current = { x: cursorX - el.x, y: cursorY - el.y };
-    } else {
-      dragOffsetRef.current = { x: 0, y: 0 };
-    }
-
-    setSelectedId(id);
-    setDraggingId(id);
-  };
-
-  // Global mousemove/mouseup listener while dragging
-  useEffect(() => {
-    if (draggingId === null) return;
-
-    const handlePointerMove = (e) => {
-      if (e.touches && e.touches.length > 1) return;
-      if (!containerRef.current) return;
-
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const cursorX = ((clientX - rect.left) / rect.width) * 100;
-      const cursorY = ((clientY - rect.top) / rect.height) * 100;
-
-      let newX = cursorX - dragOffsetRef.current.x;
-      let newY = cursorY - dragOffsetRef.current.y;
-
-      // Clamp raw drag target between 0 and 100%
-      newX = Math.max(0, Math.min(100, newX));
-      newY = Math.max(0, Math.min(100, newY));
-
-      let snappedX = false;
-      let snappedY = false;
-
-      // 1. Snap-to-grid math (8px increment conversion)
-      if (snapToGridRef.current && canvasWidthPxRef.current > 0 && canvasHeightPxRef.current > 0) {
-        const pxX = (newX / 100) * canvasWidthPxRef.current;
-        const pxY = (newY / 100) * canvasHeightPxRef.current;
-        const snappedPxX = Math.round(pxX / 8) * 8;
-        const snappedPxY = Math.round(pxY / 8) * 8;
-        newX = (snappedPxX / canvasWidthPxRef.current) * 100;
-        newY = (snappedPxY / canvasHeightPxRef.current) * 100;
-        snappedX = true;
-        snappedY = true;
-      }
-
-      // 2. Alignment guide detection with 1.5% threshold (Canvas center 50% and all other elements)
-      const threshold = 1.5;
-      const guides = [];
-      const otherElements = elementsRef.current.filter(el => el.id !== draggingId);
-
-      // Check vertical alignment (X position)
-      const xTargets = [50, ...otherElements.map(el => el.x)];
-      for (const targetX of xTargets) {
-        if (Math.abs(newX - targetX) <= threshold) {
-          newX = targetX;
-          guides.push({ type: 'vertical', x: targetX });
-          snappedX = true;
-          break;
-        }
-      }
-
-      // Check horizontal alignment (Y position)
-      const yTargets = [50, ...otherElements.map(el => el.y)];
-      for (const targetY of yTargets) {
-        if (Math.abs(newY - targetY) <= threshold) {
-          newY = targetY;
-          guides.push({ type: 'horizontal', y: targetY });
-          snappedY = true;
-          break;
-        }
-      }
-
-      // Default 1-decimal rounding if not snapped
-      if (!snappedX) {
-        newX = Math.round(newX * 10) / 10;
-      }
-      if (!snappedY) {
-        newY = Math.round(newY * 10) / 10;
-      }
-
-      // Clamp between 0 and 100%
-      newX = Math.max(0, Math.min(100, newX));
-      newY = Math.max(0, Math.min(100, newY));
-
-      setAlignmentGuides(guides);
-
-      setElements(prev => prev.map(el => el.id === draggingId ? { ...el, x: newX, y: newY } : el));
-    };
-
-    const handlePointerUp = () => {
-      setDraggingId(null);
-      setAlignmentGuides([]);
-    };
-
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('touchend', handlePointerUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
-    };
-  }, [draggingId]);
-
-  // Keyboard shortcut listener for editor actions
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Undo / Redo
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-
-      if (!selectedId) return;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-
-      const step = e.shiftKey ? 5 : 1;
-
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, x: Math.max(0, Math.round((el.x - step) * 10) / 10) } : el);
-        pushHistory(next);
-        setElements(next);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, x: Math.min(100, Math.round((el.x + step) * 10) / 10) } : el);
-        pushHistory(next);
-        setElements(next);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, y: Math.max(0, Math.round((el.y - step) * 10) / 10) } : el);
-        pushHistory(next);
-        setElements(next);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const next = elementsRef.current.map(el => el.id === selectedId ? { ...el, y: Math.min(100, Math.round((el.y + step) * 10) / 10) } : el);
-        pushHistory(next);
-        setElements(next);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        deleteSelectedElement();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, historyIndex]);
 
   // Fetch status and templates on load
   const fetchTemplates = () => {
@@ -767,7 +458,6 @@ export default function App() {
   };
 
   const addIconElement = (name, path) => {
-    // Generate clean URL-encoded raw SVG string
     const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"><path fill="#000000" d="${path}"/></svg>`;
     const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
     
@@ -782,7 +472,6 @@ export default function App() {
       iconName: name
     };
     
-    // Load as Image object for local offscreen canvas drawing
     const img = new Image();
     img.onload = () => {
       newEl.imgObject = img;
@@ -912,212 +601,6 @@ export default function App() {
     setElements(updatedElements);
   };
 
-  const renderQRInspector = (el) => {
-    const helperType = el.qrHelperType || 'text';
-    const fields = el.qrHelperFields || {};
-
-    return (
-      <div className="flex flex-col gap-3">
-        {/* Helper Type Selector */}
-        <div>
-          <label className="text-xs text-slate-400 mb-1 block">QR Content Helper</label>
-          <select
-            value={helperType}
-            onChange={(e) => {
-              updateQRHelper(e.target.value, {});
-              pushHistory(elementsRef.current);
-            }}
-            className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
-          >
-            <option value="text" className="bg-slate-900 text-slate-100">Plain Text / URL</option>
-            <option value="wifi" className="bg-slate-900 text-slate-100">WiFi Network</option>
-            <option value="vcard" className="bg-slate-900 text-slate-100">vCard Contact</option>
-            <option value="phone" className="bg-slate-900 text-slate-100">Phone Call</option>
-          </select>
-        </div>
-
-        {/* Plain Text / URL Fields */}
-        {helperType === 'text' && (
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">QR Code Text / URL</label>
-            <input
-              type="text"
-              value={el.content || ''}
-              onChange={(e) => updateQRHelper('text', { plainText: e.target.value })}
-              onBlur={() => pushHistory(elementsRef.current)}
-              className="w-full p-2.5 rounded-xl glass-input text-sm"
-              placeholder="https://example.com or any text"
-            />
-          </div>
-        )}
-
-        {/* WiFi Network Fields */}
-        {helperType === 'wifi' && (
-          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Network Name (SSID)</label>
-              <input
-                type="text"
-                value={fields.wifiSsid || ''}
-                onChange={(e) => updateQRHelper('wifi', { wifiSsid: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="MyHomeWiFi"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Password</label>
-              <input
-                type="text"
-                value={fields.wifiPassword || ''}
-                onChange={(e) => updateQRHelper('wifi', { wifiPassword: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="WiFi Password"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Encryption</label>
-              <select
-                value={fields.wifiEncryption || 'WPA'}
-                onChange={(e) => {
-                  updateQRHelper('wifi', { wifiEncryption: e.target.value });
-                  pushHistory(elementsRef.current);
-                }}
-                className="w-full p-2 rounded-lg glass-input text-xs text-indigo-300 font-medium"
-              >
-                <option value="WPA" className="bg-slate-900 text-slate-100">WPA / WPA2 / WPA3</option>
-                <option value="WEP" className="bg-slate-900 text-slate-100">WEP</option>
-                <option value="None" className="bg-slate-900 text-slate-100">None (Open Network)</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* vCard Contact Fields */}
-        {helperType === 'vcard' && (
-          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">First Name</label>
-                <input
-                  type="text"
-                  value={fields.vcardFirstName || ''}
-                  onChange={(e) => updateQRHelper('vcard', { vcardFirstName: e.target.value })}
-                  onBlur={() => pushHistory(elementsRef.current)}
-                  className="w-full p-2 rounded-lg glass-input text-xs"
-                  placeholder="John"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Last Name</label>
-                <input
-                  type="text"
-                  value={fields.vcardLastName || ''}
-                  onChange={(e) => updateQRHelper('vcard', { vcardLastName: e.target.value })}
-                  onBlur={() => pushHistory(elementsRef.current)}
-                  className="w-full p-2 rounded-lg glass-input text-xs"
-                  placeholder="Doe"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Phone Number</label>
-              <input
-                type="text"
-                value={fields.vcardPhone || ''}
-                onChange={(e) => updateQRHelper('vcard', { vcardPhone: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="+1 555-123-4567"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Email Address</label>
-              <input
-                type="email"
-                value={fields.vcardEmail || ''}
-                onChange={(e) => updateQRHelper('vcard', { vcardEmail: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="john@example.com"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Organization / Company</label>
-              <input
-                type="text"
-                value={fields.vcardOrg || ''}
-                onChange={(e) => updateQRHelper('vcard', { vcardOrg: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="Acme Corp"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Phone Call Fields */}
-        {helperType === 'phone' && (
-          <div className="flex flex-col gap-2.5 bg-slate-900/40 p-3 rounded-xl border border-slate-800/60">
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Phone Number</label>
-              <input
-                type="text"
-                value={fields.phoneNum || ''}
-                onChange={(e) => updateQRHelper('phone', { phoneNum: e.target.value })}
-                onBlur={() => pushHistory(elementsRef.current)}
-                className="w-full p-2 rounded-lg glass-input text-xs"
-                placeholder="+1 555-123-4567"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Compiled Data String Preview (for non-text helpers) */}
-        {helperType !== 'text' && (
-          <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Compiled QR Payload</label>
-            <div className="p-2 rounded-lg bg-slate-900 text-indigo-300 font-mono text-[10px] break-all border border-slate-800 max-h-20 overflow-y-auto whitespace-pre-wrap select-all">
-              {el.content || '(empty)'}
-            </div>
-          </div>
-        )}
-
-        {/* QR Size Slider */}
-        <div>
-          <label className="text-xs text-slate-400 mb-1 block">QR Size ({el.size || 60}px)</label>
-          <input 
-            type="range" 
-            min="20" 
-            max="180" 
-            value={el.size || 60}
-            onChange={(e) => updateSelectedElement('size', parseInt(e.target.value))}
-            onMouseUp={() => pushHistory(elementsRef.current)}
-            onTouchEnd={() => pushHistory(elementsRef.current)}
-            className="w-full accent-indigo-500"
-          />
-        </div>
-      </div>
-    );
-  };
-
-  const nudgeSelectedElement = (dx, dy) => {
-    if (!selectedElement) return;
-    const newX = Math.max(0, Math.min(100, Math.round((selectedElement.x + dx) * 10) / 10));
-    const newY = Math.max(0, Math.min(100, Math.round((selectedElement.y + dy) * 10) / 10));
-    const newElements = elements.map(el => el.id === selectedId ? { ...el, x: newX, y: newY } : el);
-    pushHistory(newElements);
-    setElements(newElements);
-  };
-
-  const deleteSelectedElement = () => {
-    const newElements = elements.filter(el => el.id !== selectedId);
-    pushHistory(newElements);
-    setElements(newElements);
-    setSelectedId(newElements.length > 0 ? newElements[0].id : null);
-  };
-
   const sendToBack = () => {
     if (!selectedId) return;
     const item = elements.find(el => el.id === selectedId);
@@ -1137,7 +620,6 @@ export default function App() {
     pushHistory(newElements);
     setElements(newElements);
   };
-
 
   // Simple Code128 (Type B) encoder and canvas drawer helper
   const drawCode128OnCanvas = (ctx, text, x, y, width, height) => {
@@ -1173,14 +655,14 @@ export default function App() {
     encodedModules += patterns[checkDigit];
     encodedModules += stopPattern;
     
-    const totalModules = encodedModules.split('').reduce((sum, char) => sum + parseInt(char), 0);
+    const totalModules = encodedModules.split('').reduce((sum, char) => sum + parseInt(char, 10), 0);
     const moduleW = width / totalModules;
     
     ctx.fillStyle = "#000000";
     let curX = x - width / 2;
     
     for (let i = 0; i < encodedModules.length; i++) {
-      const val = parseInt(encodedModules[i]);
+      const val = parseInt(encodedModules[i], 10);
       const isBar = (i % 2 === 0);
       const drawW = val * moduleW;
       
@@ -1319,7 +801,6 @@ export default function App() {
     return canvas;
   };
 
-
   const handleExecuteBatchPrint = async (jobs) => {
     if (useBrowserBt) {
       await handlePrintBatchDirect(jobs);
@@ -1358,7 +839,6 @@ export default function App() {
     try {
       for (let i = 0; i < jobs.length; i++) {
         const job = jobs[i];
-        // Substitute variables in elements
         const jobElements = elements.map(el => {
           let content = el.content || '';
           if (el.type === 'text' || el.type === 'qr') {
@@ -1369,7 +849,6 @@ export default function App() {
           return { ...el, content };
         });
 
-        // Preload any QR codes for this job
         for (let j = 0; j < jobElements.length; j++) {
           const el = jobElements[j];
           if (el.type === 'qr') {
@@ -1391,7 +870,6 @@ export default function App() {
           throw new Error(`Failed to send job #${i + 1} in batch`);
         }
         setPrintStatus({ type: 'success', msg: `Printed label #${i + 1}/${jobs.length} in batch...` });
-        // Tiny pause between labels
         await new Promise(r => setTimeout(r, 200));
       }
       setPrintStatus({ type: 'success', msg: `Successfully printed all ${jobs.length} labels in batch!` });
@@ -1629,312 +1107,19 @@ export default function App() {
           {renderSidebarContent(null)}
 
           {/* Element Inspector — desktop */}
-          {selectedElement && (
-            <div className="flex flex-col gap-4 border-t border-slate-800/80 pt-4 pb-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                  Element Properties
-                </span>
-                <button 
-                  onClick={deleteSelectedElement}
-                  className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
-                  title="Delete element"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-
-            {/* Text, Barcode content input */}
-            {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && selectedElement.type !== 'qr' && (
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">
-                  {selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
-                </label>
-                <input 
-                  type="text" 
-                  value={selectedElement.content || ''}
-                  onChange={(e) => updateSelectedElement('content', e.target.value)}
-                  onBlur={() => pushHistory(elementsRef.current)}
-                  className="w-full p-2.5 rounded-xl glass-input text-sm"
-                />
-              </div>
-            )}
-
-            {/* Barcode Type selection */}
-            {selectedElement.type === 'barcode' && (
-              <div>
-                <label className="text-xs text-slate-400 mb-1 block">Barcode Encoding</label>
-                <select
-                  value={selectedElement.barcodeType || 'code128'}
-                  onChange={(e) => {
-                    updateSelectedElement('barcodeType', e.target.value);
-                    pushHistory(elementsRef.current);
-                  }}
-                  className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
-                >
-                  <option value="code128" className="bg-slate-900 text-slate-100">Code 128 (Standard)</option>
-                  <option value="ean13" className="bg-slate-900 text-slate-100">EAN 13 (Retail Product)</option>
-                  <option value="ean8" className="bg-slate-900 text-slate-100">EAN 8 (Mini Retail)</option>
-                </select>
-              </div>
-            )}
-
-            {selectedElement.type === 'text' && (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Font Family</label>
-                  <select
-                    value={selectedElement.fontFamily || 'sans-serif'}
-                    onChange={(e) => {
-                      updateSelectedElement('fontFamily', e.target.value);
-                      pushHistory(elementsRef.current);
-                    }}
-                    className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
-                  >
-                    <option value="sans-serif" className="bg-slate-900 text-slate-100">Sans-serif</option>
-                    <option value="monospace" className="bg-slate-900 text-slate-100">Monospace</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
-                  <input 
-                    type="range" 
-                    min="8" 
-                    max="64" 
-                    value={selectedElement.fontSize || 22}
-                    onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
-                    onMouseUp={() => pushHistory(elementsRef.current)}
-                    onTouchEnd={() => pushHistory(elementsRef.current)}
-                    className="w-full accent-indigo-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {selectedElement.type === 'qr' && renderQRInspector(selectedElement)}
-
-            {(selectedElement.type === 'image' || selectedElement.type === 'barcode' || selectedElement.type === 'line' || selectedElement.type === 'rectangle') && (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs text-slate-400">
-                      {selectedElement.type === 'line' ? 'Line Length' : 'Width'}
-                    </label>
-                    <span className="text-xs font-mono text-indigo-300">{selectedElement.width || 60}px</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="5" 
-                    max="320" 
-                    value={selectedElement.width || 60}
-                    onChange={(e) => {
-                      const newW = parseInt(e.target.value);
-                      const ratio = (selectedElement.height || 60) / (selectedElement.width || 60);
-                      if (selectedElement.type === 'image' && selectedElement.keepRatio !== false && ratio) {
-                        setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, width: newW, height: Math.round(newW * ratio) } : el));
-                      } else {
-                        updateSelectedElement('width', newW);
-                      }
-                    }}
-                    onMouseUp={() => pushHistory(elementsRef.current)}
-                    onTouchEnd={() => pushHistory(elementsRef.current)}
-                    className="w-full accent-indigo-500"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs text-slate-400">
-                      {selectedElement.type === 'line' ? 'Line Thickness' : 'Height'}
-                    </label>
-                    <span className="text-xs font-mono text-indigo-300">{selectedElement.height || (selectedElement.type === 'line' ? 4 : 60)}px</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min={selectedElement.type === 'line' ? 1 : 5} 
-                    max={selectedElement.type === 'line' ? 24 : 150} 
-                    value={selectedElement.height || (selectedElement.type === 'line' ? 4 : 60)}
-                    onChange={(e) => {
-                      const newH = parseInt(e.target.value);
-                      const ratio = (selectedElement.width || 60) / (selectedElement.height || 60);
-                      if (selectedElement.type === 'image' && selectedElement.keepRatio !== false && ratio) {
-                        setElements(prev => prev.map(el => el.id === selectedElement.id ? { ...el, height: newH, width: Math.round(newH * ratio) } : el));
-                      } else {
-                        updateSelectedElement('height', newH);
-                      }
-                    }}
-                    onMouseUp={() => pushHistory(elementsRef.current)}
-                    onTouchEnd={() => pushHistory(elementsRef.current)}
-                    className="w-full accent-indigo-500"
-                  />
-                </div>
-                {selectedElement.type === 'image' && (
-                  <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pt-1">
-                    <input 
-                      type="checkbox"
-                      checked={selectedElement.keepRatio !== false}
-                      onChange={(e) => {
-                        updateSelectedElement('keepRatio', e.target.checked);
-                        pushHistory(elementsRef.current);
-                      }}
-                      className="rounded border-slate-700 bg-slate-900 text-indigo-600 accent-indigo-500"
-                    />
-                    Lock Aspect Ratio
-                  </label>
-                )}
-                {selectedElement.type === 'rectangle' && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-400">Border Thickness</label>
-                      <span className="text-xs font-mono text-indigo-300">{selectedElement.thickness || 2}px</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="12" 
-                      value={selectedElement.thickness || 2}
-                      onChange={(e) => updateSelectedElement('thickness', parseInt(e.target.value))}
-                      onMouseUp={() => pushHistory(elementsRef.current)}
-                      onTouchEnd={() => pushHistory(elementsRef.current)}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Position & Alignment Controls */}
-            <div className="border-t border-slate-800/60 pt-3 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Move className="w-3.5 h-3.5 text-indigo-400" />
-                Position & Alignment
-              </span>
-
-                {/* Numerical Sliders */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-400">Position X</label>
-                      <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.x)}%</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="100" 
-                      value={selectedElement.x}
-                      onChange={(e) => updateSelectedElement('x', parseFloat(e.target.value))}
-                      onMouseUp={() => pushHistory(elementsRef.current)}
-                      onTouchEnd={() => pushHistory(elementsRef.current)}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-400">Position Y</label>
-                      <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.y)}%</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="100" 
-                      value={selectedElement.y}
-                      onChange={(e) => updateSelectedElement('y', parseFloat(e.target.value))}
-                      onMouseUp={() => pushHistory(elementsRef.current)}
-                      onTouchEnd={() => pushHistory(elementsRef.current)}
-                      className="w-full accent-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Align & Nudge */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-slate-400">Quick Align & Nudge</label>
-                  <div className="flex flex-col gap-2 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/60">
-                    <div className="flex items-center justify-between gap-2">
-                      <button 
-                        onClick={() => {
-                          const newElements = elements.map(el => el.id === selectedId ? { ...el, x: 50 } : el);
-                          pushHistory(newElements);
-                          setElements(newElements);
-                        }}
-                        className="flex-1 py-1.5 rounded-lg glass-input text-[11px] font-medium hover:border-indigo-500/50 transition flex items-center justify-center gap-1"
-                        title="Center Horizontally"
-                      >
-                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400" />
-                        Center X
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const newElements = elements.map(el => el.id === selectedId ? { ...el, y: 50 } : el);
-                          pushHistory(newElements);
-                          setElements(newElements);
-                        }}
-                        className="flex-1 py-1.5 rounded-lg glass-input text-[11px] font-medium hover:border-indigo-500/50 transition flex items-center justify-center gap-1"
-                        title="Center Vertically"
-                      >
-                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" />
-                        Center Y
-                      </button>
-                    </div>
-
-                    {/* D-Pad Nudge Buttons */}
-                    <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
-                      <div></div>
-                      <button 
-                        onClick={() => nudgeSelectedElement(0, -2)}
-                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
-                        title="Nudge Up"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </button>
-                      <div></div>
-                      <button 
-                        onClick={() => nudgeSelectedElement(-2, 0)}
-                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
-                        title="Nudge Left"
-                      >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => nudgeSelectedElement(0, 2)}
-                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
-                        title="Nudge Down"
-                      >
-                        <ArrowDown className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => nudgeSelectedElement(2, 0)}
-                        className="p-1 rounded hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-400 transition flex items-center justify-center"
-                        title="Nudge Right"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Layer arrangement buttons */}
-                    <div className="grid grid-cols-2 gap-2 mt-1.5 pt-2 border-t border-slate-800/80">
-                      <button 
-                        onClick={sendToBack}
-                        className="py-1 px-2 rounded bg-slate-800/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-400 hover:text-slate-200 transition"
-                        title="Send Element to Back (bottom layer)"
-                      >
-                        Send to Back
-                      </button>
-                      <button 
-                        onClick={bringToFront}
-                        className="py-1 px-2 rounded bg-slate-800/50 hover:bg-slate-800 text-[10px] font-semibold text-slate-400 hover:text-slate-200 transition"
-                        title="Bring Element to Front (top layer)"
-                      >
-                        Bring to Front
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+          <ElementInspector
+            selectedElement={selectedElement}
+            updateSelectedElement={updateSelectedElement}
+            updateQRHelper={updateQRHelper}
+            deleteSelectedElement={deleteSelectedElement}
+            nudgeSelectedElement={nudgeSelectedElement}
+            sendToBack={sendToBack}
+            bringToFront={bringToFront}
+            pushHistory={pushHistory}
+            elementsRef={elementsRef}
+            elements={elements}
+            setElements={setElements}
+          />
         </aside>
 
         <CanvasWorkspace
@@ -1969,98 +1154,19 @@ export default function App() {
               renderSidebarContent("add")
             )}
             {(mobilePanelTab === 'inspector') && (
-              <>
-                {selectedElement ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                        Element Properties
-                      </span>
-                      <button 
-                        onClick={deleteSelectedElement}
-                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
-                        title="Delete element"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {selectedElement.type !== 'image' && selectedElement.type !== 'line' && selectedElement.type !== 'rectangle' && selectedElement.type !== 'qr' && (
-                      <div>
-                        <label className="text-xs text-slate-400 mb-1 block">
-                          {selectedElement.type === 'barcode' ? 'Barcode Content' : 'Text Content'}
-                        </label>
-                        <input 
-                          type="text" 
-                          value={selectedElement.content || ''}
-                          onChange={(e) => updateSelectedElement('content', e.target.value)}
-                          className="w-full p-2.5 rounded-xl glass-input text-sm"
-                        />
-                      </div>
-                    )}
-                    {selectedElement.type === 'text' && (
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="text-xs text-slate-400 mb-1 block">Font Family</label>
-                          <select
-                            value={selectedElement.fontFamily || 'sans-serif'}
-                            onChange={(e) => {
-                              updateSelectedElement('fontFamily', e.target.value);
-                              pushHistory(elementsRef.current);
-                            }}
-                            className="w-full p-2.5 rounded-xl glass-input text-sm text-indigo-300 font-semibold"
-                          >
-                            <option value="sans-serif" className="bg-slate-900 text-slate-100">Sans-serif</option>
-                            <option value="monospace" className="bg-slate-900 text-slate-100">Monospace</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-400 mb-1 block">Font Size ({selectedElement.fontSize}px)</label>
-                          <input type="range" min="8" max="64" value={selectedElement.fontSize || 22}
-                            onChange={(e) => updateSelectedElement('fontSize', parseInt(e.target.value))}
-                            className="w-full accent-indigo-500" />
-                        </div>
-                      </div>
-                    )}
-                    {selectedElement.type === 'qr' && renderQRInspector(selectedElement)}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-xs text-slate-400">Position X</label>
-                          <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.x)}%</span>
-                        </div>
-                        <input type="range" min="0" max="100" value={selectedElement.x}
-                          onChange={(e) => updateSelectedElement('x', parseFloat(e.target.value))}
-                          className="w-full accent-indigo-500" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-xs text-slate-400">Position Y</label>
-                          <span className="text-xs font-mono text-indigo-300">{Math.round(selectedElement.y)}%</span>
-                        </div>
-                        <input type="range" min="0" max="100" value={selectedElement.y}
-                          onChange={(e) => updateSelectedElement('y', parseFloat(e.target.value))}
-                          className="w-full accent-indigo-500" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => updateSelectedElement('x', 50)}
-                        className="flex-1 px-2 py-2 rounded-lg glass-input text-xs font-medium flex items-center justify-center gap-1">
-                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400" /> Center X
-                      </button>
-                      <button onClick={() => updateSelectedElement('y', 50)}
-                        className="flex-1 px-2 py-2 rounded-lg glass-input text-xs font-medium flex items-center justify-center gap-1">
-                        <AlignCenter className="w-3.5 h-3.5 text-indigo-400 rotate-90" /> Center Y
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-slate-500 text-sm gap-3">
-                    <Sliders className="w-8 h-8 text-slate-700" />
-                    <p>Tap an element on the canvas to inspect it</p>
-                  </div>
-                )}
-              </>
+              <ElementInspector
+                selectedElement={selectedElement}
+                updateSelectedElement={updateSelectedElement}
+                updateQRHelper={updateQRHelper}
+                deleteSelectedElement={deleteSelectedElement}
+                nudgeSelectedElement={nudgeSelectedElement}
+                sendToBack={sendToBack}
+                bringToFront={bringToFront}
+                pushHistory={pushHistory}
+                elementsRef={elementsRef}
+                elements={elements}
+                setElements={setElements}
+              />
             )}
             {(mobilePanelTab === 'print') && (
               <div className="flex flex-col gap-4">
@@ -2074,13 +1180,13 @@ export default function App() {
                     <div>
                       <label className="text-xs text-slate-400 mb-1 block">Density ({density})</label>
                       <input type="range" min="0" max="15" value={density}
-                        onChange={(e) => setDensity(parseInt(e.target.value))}
+                        onChange={(e) => setDensity(parseInt(e.target.value, 10))}
                         className="w-full accent-indigo-500" />
                     </div>
                     <div>
                       <label className="text-xs text-slate-400 mb-1 block">Copies</label>
                       <input type="number" min="1" max="100" value={copies}
-                        onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                        onChange={(e) => setCopies(parseInt(e.target.value, 10) || 1)}
                         className="w-full p-2 rounded-xl glass-input text-xs" />
                     </div>
                   </div>
@@ -2181,4 +1287,3 @@ export default function App() {
     </div>
   );
 }
-
