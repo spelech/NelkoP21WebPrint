@@ -327,3 +327,239 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
     result += "\r\nPRINT " + String(req.copies) + ",1\r\n";
     return result;
 }
+
+String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req) {
+    if (jsonStr.length() == 0) {
+        return generateTSPLStream(req);
+    }
+
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+    JsonDocument doc;
+#else
+    DynamicJsonDocument doc(4096);
+#endif
+    DeserializationError error = deserializeJson(doc, jsonStr);
+    if (error) {
+        return generateTSPLStream(req);
+    }
+
+    float widthMm = req.widthMm;
+    float heightMm = req.heightMm;
+    float gapMm = req.gapMm;
+    int copies = req.copies;
+
+    if (doc["preset"].is<JsonObject>()) {
+        JsonObject preset = doc["preset"];
+        if (preset["width"].is<float>()) widthMm = preset["width"].as<float>();
+        else if (preset["widthMm"].is<float>()) widthMm = preset["widthMm"].as<float>();
+
+        if (preset["height"].is<float>()) heightMm = preset["height"].as<float>();
+        else if (preset["heightMm"].is<float>()) heightMm = preset["heightMm"].as<float>();
+
+        if (preset["gap"].is<float>()) gapMm = preset["gap"].as<float>();
+        else if (preset["gapMm"].is<float>()) gapMm = preset["gapMm"].as<float>();
+    }
+
+    if (doc["widthMm"].is<float>()) widthMm = doc["widthMm"].as<float>();
+    else if (doc["width"].is<float>()) widthMm = doc["width"].as<float>();
+
+    if (doc["heightMm"].is<float>()) heightMm = doc["heightMm"].as<float>();
+    else if (doc["height"].is<float>()) heightMm = doc["height"].as<float>();
+
+    if (doc["gapMm"].is<float>()) gapMm = doc["gapMm"].as<float>();
+    else if (doc["gap"].is<float>()) gapMm = doc["gap"].as<float>();
+
+    if (doc["copies"].is<int>()) copies = doc["copies"].as<int>();
+
+    int logicalW = (int)(widthMm * 8.0f);
+    int logicalH = (int)(heightMm * 8.0f);
+    if (logicalW < 8) logicalW = 320;
+    if (logicalH < 8) logicalH = 112;
+    logicalW = ((logicalW + 7) / 8) * 8;
+    int logicalWidthBytes = logicalW / 8;
+    int logicalTotalBytes = logicalWidthBytes * logicalH;
+
+    uint8_t* logicalBuf = (uint8_t*)malloc(logicalTotalBytes);
+    if (!logicalBuf) {
+        return generateTSPLStream(req);
+    }
+    memset(logicalBuf, 0xFF, logicalTotalBytes);
+
+    if (doc["elements"].is<JsonArray>()) {
+        JsonArray elements = doc["elements"].as<JsonArray>();
+        for (JsonObject elem : elements) {
+            String type = elem["type"] | "";
+            float rawX = elem["x"] | 0.0f;
+            float rawY = elem["y"] | 0.0f;
+            int x = (int)(rawX / 100.0f * (float)logicalW);
+            int y = (int)(rawY / 100.0f * (float)logicalH);
+
+            if (type == "text") {
+                String content = elem["content"].as<String>();
+                if (content.indexOf("{{mainText}}") >= 0) {
+                    content.replace("{{mainText}}", req.mainText);
+                } else if (content.indexOf("{{subtitle}}") >= 0) {
+                    content.replace("{{subtitle}}", req.subtitle);
+                } else if ((content == "" || content == "Main Text") && req.mainText.length() > 0) {
+                    content = req.mainText;
+                } else if (content == "Subtitle" && req.subtitle.length() > 0) {
+                    content = req.subtitle;
+                }
+
+                int fontSize = elem["fontSize"] | 16;
+                int scale = (fontSize <= 16) ? 1 : ((fontSize <= 28) ? 2 : 3);
+                int textWidth = content.length() * 9 * scale;
+                String align = elem["align"] | "center";
+                int startX = (align == "left") ? x : (x - textWidth / 2);
+                int startY = y - (16 * scale) / 2;
+                if (startX < 0) startX = 0;
+                if (startY < 0) startY = 0;
+
+                drawString(logicalBuf, logicalWidthBytes, startX, startY, content, scale);
+            }
+            else if (type == "barcode") {
+                String content = elem["content"].as<String>();
+                if (content.indexOf("{{barcodeData}}") >= 0) {
+                    content.replace("{{barcodeData}}", req.barcodeData);
+                } else if ((content == "" || content == "12345678" || content == "BARCODE") && req.barcodeData.length() > 0) {
+                    content = req.barcodeData;
+                }
+
+                int bHeight = elem["height"] | req.barcodeHeight;
+                if (bHeight <= 0) bHeight = 24;
+                int numModules = (content.length() + 3) * 11 + 2;
+                int elemW = elem["width"] | 0;
+                int moduleWidth = 1;
+                if (elemW > 0 && numModules > 0) {
+                    moduleWidth = elemW / numModules;
+                } else if (numModules * 2 <= (logicalW - 16)) {
+                    moduleWidth = 2;
+                }
+                if (moduleWidth < 1) moduleWidth = 1;
+                if (moduleWidth > 3) moduleWidth = 3;
+
+                int barcodeWidth = numModules * moduleWidth;
+                int startX = x - barcodeWidth / 2;
+                int startY = y - bHeight / 2;
+                if (startX < 0) startX = 0;
+                if (startY < 0) startY = 0;
+
+                drawBarcode128(logicalBuf, logicalWidthBytes, startX, startY, bHeight, moduleWidth, content);
+            }
+            else if (type == "line") {
+                int lw = elem["width"] | 1;
+                int lh = elem["height"] | 1;
+                int startX = x - lw / 2;
+                int startY = y - lh / 2;
+                for (int py = startY; py < startY + lh; py++) {
+                    for (int px = startX; px < startX + lw; px++) {
+                        setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                    }
+                }
+            }
+            else if (type == "rectangle") {
+                int rw = elem["width"] | 10;
+                int rh = elem["height"] | 10;
+                int thick = elem["thickness"] | 1;
+                int startX = x - rw / 2;
+                int startY = y - rh / 2;
+                for (int py = startY; py < startY + rh; py++) {
+                    for (int px = startX; px < startX + rw; px++) {
+                        if (px < startX + thick || px >= startX + rw - thick ||
+                            py < startY + thick || py >= startY + rh - thick) {
+                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        }
+                    }
+                }
+            }
+            else if (type == "qr") {
+                String content = elem["content"].as<String>();
+                if (content.indexOf("{{qrData}}") >= 0) {
+                    content.replace("{{qrData}}", req.qrData);
+                } else if ((content == "" || content == "QR_CODE") && req.qrData.length() > 0) {
+                    content = req.qrData;
+                }
+
+                int qrSize = elem["size"] | elem["width"] | 40;
+                if (qrSize < 10) qrSize = 40;
+                int startX = x - qrSize / 2;
+                int startY = y - qrSize / 2;
+
+                for (int py = startY; py < startY + qrSize; py++) {
+                    for (int px = startX; px < startX + qrSize; px++) {
+                        if (px < startX + 2 || px >= startX + qrSize - 2 ||
+                            py < startY + 2 || py >= startY + qrSize - 2) {
+                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        }
+                    }
+                }
+                int boxSize = qrSize / 4;
+                if (boxSize >= 4) {
+                    for (int py = startY + 2; py < startY + 2 + boxSize; py++) {
+                        for (int px = startX + 2; px < startX + 2 + boxSize; px++) {
+                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        }
+                    }
+                    for (int py = startY + 2; py < startY + 2 + boxSize; py++) {
+                        for (int px = startX + qrSize - 2 - boxSize; px < startX + qrSize - 2; px++) {
+                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        }
+                    }
+                    for (int py = startY + qrSize - 2 - boxSize; py < startY + qrSize - 2; py++) {
+                        for (int px = startX + 2; px < startX + 2 + boxSize; px++) {
+                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    int physW = logicalH;
+    int physH = logicalW;
+    physW = ((physW + 7) / 8) * 8;
+    int physWidthBytes = physW / 8;
+
+    int physTotalBytes = physWidthBytes * physH;
+    uint8_t* physBuf = (uint8_t*)malloc(physTotalBytes);
+    if (!physBuf) {
+        free(logicalBuf);
+        return generateTSPLStream(req);
+    }
+    memset(physBuf, 0xFF, physTotalBytes);
+
+    for (int ly = 0; ly < logicalH; ly++) {
+        for (int lx = 0; lx < logicalW; lx++) {
+            int lByteIdx = (ly * logicalWidthBytes) + (lx / 8);
+            int lBitIdx = 7 - (lx % 8);
+            bool isBlack = ((logicalBuf[lByteIdx] & (1 << lBitIdx)) == 0);
+
+            if (isBlack) {
+                int px = logicalH - 1 - ly;
+                int py = lx;
+
+                int pByteIdx = (py * physWidthBytes) + (px / 8);
+                int pBitIdx = 7 - (px % 8);
+                physBuf[pByteIdx] &= ~(1 << pBitIdx);
+            }
+        }
+    }
+    free(logicalBuf);
+
+    String header = "";
+    header += "SIZE " + String((int)heightMm) + " mm, " + String((int)widthMm) + " mm\r\n";
+    header += "GAP " + String((int)gapMm) + " mm, 0 mm\r\n";
+    header += "DIRECTION 0\r\n";
+    header += "CLS\r\n";
+    header += "BITMAP 0,0," + String(physWidthBytes) + "," + String(physH) + ",0,";
+
+    String result = header;
+    for (int i = 0; i < physTotalBytes; i++) {
+        result += (char)physBuf[i];
+    }
+    free(physBuf);
+
+    result += "\r\nPRINT " + String(copies) + ",1\r\n";
+    return result;
+}
+

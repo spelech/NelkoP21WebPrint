@@ -2,6 +2,7 @@
 #define TSPL_GENERATOR_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 struct SimpleLabelRequest {
     float widthMm = 40.0;
@@ -22,5 +23,6 @@ struct SimpleLabelRequest {
 };
 
 String generateTSPLStream(const SimpleLabelRequest& req);
+String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req);
 
 #endif
