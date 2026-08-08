@@ -23,25 +23,26 @@ jobs:
       - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
-      - name: Install ESP32 Board Core
+      - name: Install ESP32 Board Core & Libraries
         run: |
           arduino-cli config init
           arduino-cli config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
+          arduino-cli lib install ArduinoJson
 
       - name: Compile Arduino Sketch
         run: |
-          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs --output-dir ./build .
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --output-dir ./build .
 
       - name: Upload Firmware Binary Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: esp32-labelprinter-firmware-v1.0.0
+          name: esp32-labelprinter-firmware
           path: ./build/*.bin
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ./build/*.bin
