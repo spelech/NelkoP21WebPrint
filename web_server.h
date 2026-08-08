@@ -8,4 +8,8 @@ extern WebServer webServer;
 void initWebServer();
 void handleWebServer();
 
+String getStoredTemplateJSON();
+bool saveStoredTemplateJSON(const String& json);
+void clearStoredTemplateJSON();
+
 #endif

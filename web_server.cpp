@@ -5,6 +5,7 @@
 #include "wifi_manager.h"
 #include "tspl_generator.h"
 #include <WiFi.h>
+#include <Preferences.h>
 
 WebServer webServer(WEB_SERVER_PORT);
 WiFiServer logServer(8080);
@@ -418,6 +419,60 @@ void handleBtSaveApi() {
     webServer.send(400, "application/json", "{\"error\":\"Invalid MAC address\"}");
 }
 
+String getStoredTemplateJSON() {
+    Preferences prefs;
+    prefs.begin("label-tpl", true);
+    String json = prefs.getString("layout", "");
+    prefs.end();
+    return json;
+}
+
+bool saveStoredTemplateJSON(const String& json) {
+    Preferences prefs;
+    prefs.begin("label-tpl", false);
+    size_t written = prefs.putString("layout", json);
+    prefs.end();
+    return written > 0;
+}
+
+void clearStoredTemplateJSON() {
+    Preferences prefs;
+    prefs.begin("label-tpl", false);
+    prefs.remove("layout");
+    prefs.end();
+}
+
+void handleTemplateSaveApi() {
+    if (!checkAuth()) return;
+    String body = "";
+    if (webServer.hasArg("plain")) {
+        body = webServer.arg("plain");
+    } else if (webServer.hasArg("json")) {
+        body = webServer.arg("json");
+    }
+
+    if (body.length() > 0 && saveStoredTemplateJSON(body)) {
+        webServer.send(200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        webServer.send(400, "application/json", "{\"error\":\"Invalid template JSON\"}");
+    }
+}
+
+void handleTemplateLoadApi() {
+    if (!checkAuth()) return;
+    String storedJson = getStoredTemplateJSON();
+    if (storedJson.length() == 0) {
+        storedJson = "{}";
+    }
+    webServer.send(200, "application/json", storedJson);
+}
+
+void handleTemplateResetApi() {
+    if (!checkAuth()) return;
+    clearStoredTemplateJSON();
+    webServer.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
 void handlePrintApi() {
     if (!checkAuth()) return;
     if (webServer.hasArg("plain")) {
@@ -474,7 +529,14 @@ void handlePrintApi() {
             if (colon != -1) req.borderThickness = body.substring(colon + 1).toInt();
         }
 
-        String tsplPayload = generateTSPLStream(req);
+        String storedJson = getStoredTemplateJSON();
+        String tsplPayload;
+        if (storedJson.length() > 0) {
+            tsplPayload = generateTSPLFromJSON(storedJson, req);
+        } else {
+            tsplPayload = generateTSPLStream(req);
+        }
+
         if (isPrinterConnected()) {
             SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
             delay(50);
@@ -513,6 +575,9 @@ void initWebServer() {
     webServer.on("/api/wifi/save", HTTP_POST, handleSaveApi);
     webServer.on("/api/bt/scan", HTTP_GET, handleBtScanApi);
     webServer.on("/api/bt/save", HTTP_POST, handleBtSaveApi);
+    webServer.on("/api/template/save", HTTP_POST, handleTemplateSaveApi);
+    webServer.on("/api/template/load", HTTP_GET, handleTemplateLoadApi);
+    webServer.on("/api/template/reset", HTTP_POST, handleTemplateResetApi);
     webServer.on("/api/print", HTTP_POST, handlePrintApi);
 
     // Captive Portal OS Detection Probe Handlers
