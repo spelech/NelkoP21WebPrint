@@ -58,9 +58,17 @@ bool isPrinterConnected() {
         printerConnected = true;
         return true;
     }
-    Logger::log("Printer disconnected. Attempting on-demand connection...");
+    
+    // Check if default placeholder MAC is still set
+    if (macAddress[0] == 0x00 && macAddress[1] == 0x11 && macAddress[2] == 0x22) {
+        printerConnected = false;
+        return false;
+    }
+
+    // Try to connect if offline
+    Logger::log("Printer disconnected. Attempting Bluetooth connection to %s...", getPrinterMACString().c_str());
     if (SerialBT.connect(macAddress)) {
-        Logger::log("On-demand Bluetooth connection successful!");
+        Logger::log("Bluetooth connection successful!");
         printerConnected = true;
         return true;
     }
@@ -69,7 +77,30 @@ bool isPrinterConnected() {
 }
 
 void checkPrinterConnection() {
-    printerConnected = SerialBT.connected();
+    unsigned long now = millis();
+    if (SerialBT.connected()) {
+        printerConnected = true;
+        return;
+    }
+    
+    printerConnected = false;
+
+    // Check if placeholder MAC is set; don't auto-reconnect if unconfigured
+    if (macAddress[0] == 0x00 && macAddress[1] == 0x11 && macAddress[2] == 0x22) {
+        return;
+    }
+
+    // Auto-reconnect periodically every CHECK_INTERVAL_MS (10s) without spamming
+    if (now - lastCheckTime >= CHECK_INTERVAL_MS) {
+        lastCheckTime = now;
+        Logger::log("Auto-reconnecting Bluetooth printer (%s)...", getPrinterMACString().c_str());
+        if (SerialBT.connect(macAddress)) {
+            Logger::log("Auto-reconnected to Bluetooth printer successfully!");
+            printerConnected = true;
+        } else {
+            Logger::log("Auto-reconnect attempt failed. Next retry in 10s.");
+        }
+    }
 }
 
 String scanBluetoothDevices() {

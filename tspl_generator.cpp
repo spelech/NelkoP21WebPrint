@@ -145,7 +145,7 @@ static const uint16_t CODE128_PATTERNS[107] = {
 #define CODE128_STOP    106
 
 static void setPixelBlack(uint8_t* buf, int widthBytes, int x, int y) {
-    if (x < 0 || y < 0) return;
+    if (x < 0 || y < 0 || x >= (widthBytes * 8)) return;
     int byteIdx = (y * widthBytes) + (x / 8);
     int bitIdx = 7 - (x % 8);
     buf[byteIdx] &= ~(1 << bitIdx);
@@ -509,6 +509,37 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                         for (int px = startX + 2; px < startX + 2 + boxSize; px++) {
                             setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
                         }
+                    }
+                }
+            }
+            else if (type == "image" || type == "icon") {
+                int imgW = elem["width"] | 40;
+                int imgH = elem["height"] | 40;
+                if (imgW < 10) imgW = 40;
+                if (imgH < 10) imgH = 40;
+                int startX = x - imgW / 2;
+                int startY = y - imgH / 2;
+
+                for (int py = startY; py < startY + imgH; py++) {
+                    for (int px = startX; px < startX + imgW; px++) {
+                        if (px < startX + 2 || px >= startX + imgW - 2 ||
+                            py < startY + 2 || py >= startY + imgH - 2) {
+                            if (px >= 0 && px < logicalW && py >= 0 && py < logicalH) {
+                                setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            }
+                        }
+                    }
+                }
+                for (int d = 2; d < imgW - 2 && d < imgH - 2; d++) {
+                    int px1 = startX + d;
+                    int py1 = startY + d;
+                    int px2 = startX + imgW - 1 - d;
+                    int py2 = startY + d;
+                    if (px1 >= 0 && px1 < logicalW && py1 >= 0 && py1 < logicalH) {
+                        setPixelBlack(logicalBuf, logicalWidthBytes, px1, py1);
+                    }
+                    if (px2 >= 0 && px2 < logicalW && py2 >= 0 && py2 < logicalH) {
+                        setPixelBlack(logicalBuf, logicalWidthBytes, px2, py2);
                     }
                 }
             }
