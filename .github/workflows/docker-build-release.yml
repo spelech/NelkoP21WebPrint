@@ -90,9 +90,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up QEMU (Multi-arch support for x86_64 & ARM64)
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -115,12 +112,12 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
 
-      - name: Build and Push Multi-Arch Docker Image to GHCR
+      - name: Build and Push Docker Image to GHCR
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

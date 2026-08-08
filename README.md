@@ -33,7 +33,7 @@ An open-source, containerized application suite for the **Nelko P21** thermal la
   * **TCP Network Bridge**: Connect over Wi-Fi to ESP32 bridges (e.g. `agiledivider/LabelPrinter-esp`) or ESPHome proxy nodes.
   * **Direct Bluetooth SPP**: Connect over Linux host Bluetooth stack (`PyBluez` / `/dev/rfcomm0`).
 * **🧪 Automated Test Suite**: 100% passing unit & integration test suite (`python backend/tests/run_tests.py`).
-* **🐳 Containerized & GHCR Pipeline**: Pre-built multi-architecture Docker images (`linux/amd64`, `linux/arm64`) published to GitHub Container Registry via automated SemVer workflows.
+* **🐳 Containerized & GHCR Pipeline**: Pre-built Docker images (`linux/amd64`) published to GitHub Container Registry via automated SemVer workflows. Instructions for building ARM64 images locally are provided below.
 
 ---
 
@@ -58,7 +58,17 @@ docker-compose up -d
 
 Access the Web Studio at **`http://<your-server-ip>:8000`**.
 
-### 2. Sample `.env` File (`.env.example`)
+### 2. Running on ARM64 (e.g., Raspberry Pi)
+Official GHCR releases are built for `linux/amd64`. If you are deploying on a Raspberry Pi or other ARM64 device, build the image locally on the host:
+```bash
+# Build the Docker image locally
+docker build -t nelko-p21-print:local -f Dockerfile .
+
+# Configure docker-compose.yml to run from the local build:
+# image: nelko-p21-print:local
+```
+
+### 3. Sample `.env` File (`.env.example`)
 
 ```ini
 # Printer Driver Mode: 'tcp' (ESP32 Network Bridge / ESPHome Proxy), 'spp' (Direct Bluetooth), or 'mock'
