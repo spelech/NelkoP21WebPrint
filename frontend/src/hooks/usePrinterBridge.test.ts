@@ -16,7 +16,35 @@ describe('usePrinterBridge', () => {
   ];
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+      this: HTMLCanvasElement,
+      contextId: string
+    ) {
+      if (contextId === '2d') {
+        const width = this.width || 100;
+        const height = this.height || 100;
+        return {
+          fillStyle: '#000000',
+          strokeStyle: '#000000',
+          lineWidth: 1,
+          font: '',
+          textAlign: 'left',
+          textBaseline: 'alphabetic',
+          translate: vi.fn(),
+          rotate: vi.fn(),
+          fillRect: vi.fn(),
+          strokeRect: vi.fn(),
+          fillText: vi.fn(),
+          drawImage: vi.fn(),
+          getImageData: vi.fn().mockImplementation((_x, _y, w, h) => ({
+            data: new Uint8ClampedArray((w || width) * (h || height) * 4)
+          }))
+        } as unknown as CanvasRenderingContext2D;
+      }
+      return null;
+    });
   });
 
   it('initializes default printer state correctly', () => {
