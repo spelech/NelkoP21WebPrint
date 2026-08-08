@@ -1,14 +1,7 @@
 import React, { useRef, ChangeEvent } from 'react';
 import { 
-  LabelPreset, 
-  LabelElement, 
-  TextElement, 
-  QRElement, 
-  BarcodeElement, 
-  LineElement, 
-  RectangleElement, 
-  ImageElement,
-  PrintStatus 
+  LabelPreset, LabelElement, TextElement, QRElement, BarcodeElement, LineElement, 
+  RectangleElement, ImageElement, PrintStatus 
 } from '../types';
 
 export interface UseElementActionsParams {
@@ -47,30 +40,15 @@ export interface UseElementActionsReturn {
 }
 
 export function useElementActions({
-  elements,
-  setElements,
-  pushHistory,
-  selectedPreset,
-  setSelectedPreset,
-  setSelectedTemplateId,
-  selectedId,
-  setSelectedId,
-  setPrintStatus
+  elements, setElements, pushHistory, selectedPreset, setSelectedPreset,
+  setSelectedTemplateId, selectedId, setSelectedId, setPrintStatus
 }: UseElementActionsParams): UseElementActionsReturn {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const layoutFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Element Actions
   const addTextElement = (): void => {
     const newEl: TextElement = {
-      id: Date.now(),
-      type: 'text',
-      content: 'New Text',
-      fontSize: 16,
-      fontStyle: 'normal',
-      fontFamily: 'sans-serif',
-      x: 50,
-      y: 50
+      id: Date.now(), type: 'text', content: 'New Text', fontSize: 16, fontStyle: 'normal', fontFamily: 'sans-serif', x: 50, y: 50
     };
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
@@ -79,14 +57,7 @@ export function useElementActions({
 
   const addQRElement = (): void => {
     const newEl: QRElement = {
-      id: Date.now(),
-      type: 'qr',
-      content: 'P21-LABEL-123',
-      qrHelperType: 'text',
-      qrHelperFields: { plainText: 'P21-LABEL-123' },
-      x: 50,
-      y: 50,
-      size: 60
+      id: Date.now(), type: 'qr', content: 'P21-LABEL-123', qrHelperType: 'text', qrHelperFields: { plainText: 'P21-LABEL-123' }, x: 50, y: 50, size: 60
     };
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
@@ -95,14 +66,7 @@ export function useElementActions({
 
   const addBarcodeElement = (): void => {
     const newEl: BarcodeElement = {
-      id: Date.now(),
-      type: 'barcode',
-      content: '12345678',
-      barcodeType: 'code128',
-      x: 50,
-      y: 50,
-      width: 100,
-      height: 30
+      id: Date.now(), type: 'barcode', content: '12345678', barcodeType: 'code128', x: 50, y: 50, width: 100, height: 30
     };
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
@@ -110,29 +74,14 @@ export function useElementActions({
   };
 
   const addLineElement = (): void => {
-    const newEl: LineElement = {
-      id: Date.now(),
-      type: 'line',
-      x: 50,
-      y: 50,
-      width: 120,
-      height: 4
-    };
+    const newEl: LineElement = { id: Date.now(), type: 'line', x: 50, y: 50, width: 120, height: 4 };
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
   };
 
   const addRectangleElement = (): void => {
-    const newEl: RectangleElement = {
-      id: Date.now(),
-      type: 'rectangle',
-      x: 50,
-      y: 50,
-      width: 160,
-      height: 60,
-      thickness: 2
-    };
+    const newEl: RectangleElement = { id: Date.now(), type: 'rectangle', x: 50, y: 50, width: 160, height: 60, thickness: 2 };
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
@@ -148,14 +97,7 @@ export function useElementActions({
       const img = new Image();
       img.onload = () => {
         const newEl: ImageElement = {
-          id: Date.now(),
-          type: 'image',
-          url: result,
-          x: 50,
-          y: 50,
-          width: 60,
-          height: 60,
-          imgObject: img
+          id: Date.now(), type: 'image', url: result, x: 50, y: 50, width: 60, height: 60, imgObject: img
         };
         pushHistory([...elements, newEl]);
         setElements(prev => [...prev, newEl]);
@@ -170,18 +112,7 @@ export function useElementActions({
   const addIconElement = (name: string, path: string): void => {
     const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"><path fill="#000000" d="${path}"/></svg>`;
     const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
-    
-    const newEl: ImageElement = {
-      id: Date.now(),
-      type: 'image',
-      url: dataUrl,
-      x: 50,
-      y: 50,
-      width: 60,
-      height: 60,
-      iconName: name
-    };
-    
+    const newEl: ImageElement = { id: Date.now(), type: 'image', url: dataUrl, x: 50, y: 50, width: 60, height: 60, iconName: name };
     const img = new Image();
     img.onload = () => {
       newEl.imgObject = img;
@@ -218,12 +149,8 @@ export function useElementActions({
           setSelectedPreset(parsed.preset);
           setSelectedTemplateId(null);
           alert("Layout imported successfully!");
-        } else {
-          alert("Invalid design JSON file structure.");
-        }
-      } catch {
-        alert("Failed to parse design file.");
-      }
+        } else alert("Invalid design JSON file structure.");
+      } catch { alert("Failed to parse design file."); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -269,7 +196,6 @@ export function useElementActions({
 
     const prevFields = selectedElement.qrHelperFields || {};
     const updatedFields = { ...prevFields, ...fieldUpdates };
-
     let compiledValue = selectedElement.content || '';
 
     if (helperType === 'wifi') {
@@ -285,7 +211,6 @@ export function useElementActions({
       const email = updatedFields.vcardEmail || '';
       const org = updatedFields.vcardOrg || '';
       const fullName = `${fn} ${ln}`.trim();
-
       const lines = ['BEGIN:VCARD', 'VERSION:3.0', `N:${ln};${fn};;;`, `FN:${fullName}`];
       if (phone) lines.push(`TEL:${phone}`);
       if (email) lines.push(`EMAIL:${email}`);
@@ -293,24 +218,17 @@ export function useElementActions({
       lines.push('END:VCARD');
       compiledValue = lines.join('\n');
     } else if (helperType === 'phone') {
-      const phone = updatedFields.phoneNum || '';
-      compiledValue = `tel:${phone}`;
+      compiledValue = `tel:${updatedFields.phoneNum || ''}`;
     } else if (helperType === 'text') {
       compiledValue = updatedFields.plainText !== undefined ? updatedFields.plainText : (selectedElement.content || '');
     }
 
     const updatedElements = elements.map(el => {
       if (el.id === selectedId) {
-        return {
-          ...el,
-          qrHelperType: helperType,
-          qrHelperFields: updatedFields,
-          content: compiledValue
-        } as LabelElement;
+        return { ...el, qrHelperType: helperType, qrHelperFields: updatedFields, content: compiledValue } as LabelElement;
       }
       return el;
     });
-
     setElements(updatedElements);
   };
 
@@ -335,22 +253,8 @@ export function useElementActions({
   };
 
   return {
-    fileInputRef,
-    layoutFileInputRef,
-    addTextElement,
-    addQRElement,
-    addBarcodeElement,
-    addLineElement,
-    addRectangleElement,
-    handleImageUpload,
-    addIconElement,
-    handleExportLayout,
-    handleImportLayout,
-    handleClearCanvas,
-    handlePushToEsp32,
-    updateSelectedElement,
-    updateQRHelper,
-    sendToBack,
-    bringToFront,
+    fileInputRef, layoutFileInputRef, addTextElement, addQRElement, addBarcodeElement, addLineElement,
+    addRectangleElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
+    handleClearCanvas, handlePushToEsp32, updateSelectedElement, updateQRHelper, sendToBack, bringToFront,
   };
 }
