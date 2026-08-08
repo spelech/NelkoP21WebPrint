@@ -27,6 +27,7 @@ export interface UseElementActionsReturn {
   addBarcodeElement: () => void;
   addLineElement: () => void;
   addRectangleElement: () => void;
+  addPlaceholderElement: (placeholderVar: string) => void;
   handleImageUpload: (e: ChangeEvent<HTMLInputElement>) => void;
   addIconElement: (name: string, path: string) => void;
   handleExportLayout: () => void;
@@ -82,6 +83,21 @@ export function useElementActions({
 
   const addRectangleElement = (): void => {
     const newEl: RectangleElement = { id: Date.now(), type: 'rectangle', x: 50, y: 50, width: 160, height: 60, thickness: 2 };
+    pushHistory([...elements, newEl]);
+    setElements([...elements, newEl]);
+    setSelectedId(newEl.id);
+  };
+
+  const addPlaceholderElement = (placeholderVar: string): void => {
+    const tag = `{{${placeholderVar}}}`;
+    let newEl: LabelElement;
+    if (placeholderVar === 'barcodeData') {
+      newEl = { id: Date.now(), type: 'barcode', content: tag, barcodeType: 'code128', x: 50, y: 50, width: 100, height: 30 };
+    } else if (placeholderVar === 'qrData') {
+      newEl = { id: Date.now(), type: 'qr', content: tag, qrHelperType: 'text', qrHelperFields: { plainText: tag }, x: 50, y: 50, size: 60 };
+    } else {
+      newEl = { id: Date.now(), type: 'text', content: tag, fontSize: (placeholderVar === 'mainText') ? 22 : 14, fontStyle: 'bold', fontFamily: 'sans-serif', x: 50, y: 50 };
+    }
     pushHistory([...elements, newEl]);
     setElements([...elements, newEl]);
     setSelectedId(newEl.id);
@@ -254,7 +270,7 @@ export function useElementActions({
 
   return {
     fileInputRef, layoutFileInputRef, addTextElement, addQRElement, addBarcodeElement, addLineElement,
-    addRectangleElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
+    addRectangleElement, addPlaceholderElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
     handleClearCanvas, handlePushToEsp32, updateSelectedElement, updateQRHelper, sendToBack, bringToFront,
   };
 }

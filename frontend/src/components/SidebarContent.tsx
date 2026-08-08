@@ -62,6 +62,7 @@ export interface SidebarContentProps {
   addBarcodeElement: () => void;
   addLineElement: () => void;
   addRectangleElement: () => void;
+  addPlaceholderElement?: (placeholderVar: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   collapsedAddElements: boolean;
@@ -246,6 +247,7 @@ export default function SidebarContent(props: SidebarContentProps): React.ReactE
         addBarcodeElement={props.addBarcodeElement}
         addLineElement={props.addLineElement}
         addRectangleElement={props.addRectangleElement}
+        addPlaceholderElement={props.addPlaceholderElement}
         fileInputRef={props.fileInputRef}
         handleImageUpload={props.handleImageUpload}
         collapsedAddElements={props.collapsedAddElements}

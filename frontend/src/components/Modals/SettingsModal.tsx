@@ -41,7 +41,7 @@ export default function SettingsModal({
               onChange={(e) => setDriverConfig({ ...driverConfig, driver_type: e.target.value })}
               className="w-full p-2.5 rounded-xl glass-input text-sm"
             >
-              <option value="tcp" className="bg-slate-900">TCP Network Bridge (ESP32 / ESPHome Proxy)</option>
+              <option value="tcp" className="bg-slate-900">TCP Network Bridge (ESP32 Print Bridge / JetDirect)</option>
               <option value="spp" className="bg-slate-900">Direct Bluetooth SPP (RFCOMM)</option>
               <option value="mock" className="bg-slate-900">Mock Driver (Testing)</option>
             </select>

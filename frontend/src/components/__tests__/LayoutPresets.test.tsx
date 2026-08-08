@@ -119,7 +119,7 @@ describe('LayoutPresets Component', () => {
 
     expect(setSelectedPreset).toHaveBeenCalled();
     expect(setElements).toHaveBeenCalled();
-    expect(setSelectedTemplateId).toHaveBeenCalledWith('1');
+    expect(setSelectedTemplateId).toHaveBeenCalledWith(1);
 
     // Selecting blank template
     fireEvent.change(templateSelect, { target: { value: '' } });

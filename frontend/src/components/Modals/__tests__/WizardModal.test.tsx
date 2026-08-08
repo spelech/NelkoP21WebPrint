@@ -31,25 +31,21 @@ describe('WizardModal Component', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('handles tab switches between PC, Mobile, and Server Bridge', () => {
+  it('handles tab switches between ESP32 Print Bridge and Direct Mobile Bluetooth', () => {
     const setWizardTab = vi.fn();
     render(<WizardModal {...defaultProps} setWizardTab={setWizardTab} />);
 
-    const pcTab = screen.getByRole('button', { name: /PC \(Web Serial\)/i });
-    const mobileTab = screen.getByRole('button', { name: /Mobile Direct/i });
-    const bridgeTab = screen.getByRole('button', { name: /^Server Bridge$/i });
+    const esp32Tab = screen.getByRole('button', { name: /ESP32 Print Bridge \(Wi-Fi\)/i });
+    const mobileTab = screen.getByRole('button', { name: /Direct Mobile Bluetooth/i });
 
     fireEvent.click(mobileTab);
     expect(setWizardTab).toHaveBeenCalledWith('mobile');
 
-    fireEvent.click(bridgeTab);
-    expect(setWizardTab).toHaveBeenCalledWith('bridge');
-
-    fireEvent.click(pcTab);
-    expect(setWizardTab).toHaveBeenCalledWith('pc');
+    fireEvent.click(esp32Tab);
+    expect(setWizardTab).toHaveBeenCalledWith('esp32');
   });
 
-  it('renders PC tab content and handles Switch to Server Bridge action', () => {
+  it('renders ESP32 Print Bridge tab content and handles Configure ESP32 / Server Bridge action', () => {
     const setUseBrowserBt = vi.fn();
     const onClose = vi.fn();
     const setShowSettings = vi.fn();
@@ -57,17 +53,16 @@ describe('WizardModal Component', () => {
     render(
       <WizardModal
         {...defaultProps}
-        wizardTab="pc"
+        wizardTab="esp32"
         setUseBrowserBt={setUseBrowserBt}
         onClose={onClose}
         setShowSettings={setShowSettings}
       />
     );
 
-    expect(screen.getByText(/Hardware & PC Compatibility Fact:/i)).toBeDefined();
-    expect(screen.getByText(/Recommended PC Solution: Server Bridge Mode/i)).toBeDefined();
+    expect(screen.getByText(/ESP32 Hardware Print Bridge & Standalone Web UI/i)).toBeDefined();
 
-    const switchBtn = screen.getByRole('button', { name: /Switch to Server Bridge Mode/i });
+    const switchBtn = screen.getByRole('button', { name: /Configure ESP32 \/ Server Bridge Settings/i });
     fireEvent.click(switchBtn);
 
     expect(setUseBrowserBt).toHaveBeenCalledWith(false);
@@ -91,29 +86,5 @@ describe('WizardModal Component', () => {
     fireEvent.click(pairBtn);
 
     expect(handleConnectBrowserBt).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders Server Bridge tab content and handles Configure Server Bridge button', () => {
-    const setUseBrowserBt = vi.fn();
-    const onClose = vi.fn();
-    const setShowSettings = vi.fn();
-
-    render(
-      <WizardModal
-        {...defaultProps}
-        wizardTab="bridge"
-        setUseBrowserBt={setUseBrowserBt}
-        onClose={onClose}
-        setShowSettings={setShowSettings}
-      />
-    );
-
-    expect(screen.getByText(/Zero-Pairing Network Printing:/i)).toBeDefined();
-    const configBtn = screen.getByRole('button', { name: /Configure Server Bridge Settings/i });
-    fireEvent.click(configBtn);
-
-    expect(setUseBrowserBt).toHaveBeenCalledWith(false);
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(setShowSettings).toHaveBeenCalledWith(true);
   });
 });

@@ -126,7 +126,7 @@ export default function LayoutPresets({
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Load Design Template</label>
               <select
-                value={selectedTemplateId || ''}
+                value={selectedTemplateId ? String(selectedTemplateId) : ''}
                 onChange={(e) => {
                   const tid = e.target.value;
                   if (!tid) {
@@ -135,7 +135,7 @@ export default function LayoutPresets({
                     setHistory([[]]);
                     setHistoryIndex(0);
                   } else {
-                    const t = templates.find(item => item.id === parseInt(tid, 10));
+                    const t = templates.find(item => String(item.id) === String(tid));
                     if (t) {
                       const foundPreset = PRESETS.find(p => p.width === t.width_mm && p.height === t.height_mm) || {
                         name: `${t.width_mm}x${t.height_mm} mm (Custom)`,
@@ -165,7 +165,7 @@ export default function LayoutPresets({
                       });
 
                       setElements(imagePreloads);
-                      setSelectedTemplateId(tid);
+                      setSelectedTemplateId(t.id);
                       setHistory([initialElements]);
                       setHistoryIndex(0);
                     }
@@ -175,7 +175,7 @@ export default function LayoutPresets({
               >
                 <option value="" className="bg-slate-900 text-slate-400">-- Start Blank / No Template --</option>
                 {templates.map(t => (
-                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
+                  <option key={t.id} value={String(t.id)} className="bg-slate-900 text-slate-100">
                     {t.name} ({t.width_mm}x{t.height_mm}mm)
                   </option>
                 ))}

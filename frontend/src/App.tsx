@@ -98,9 +98,9 @@ export default function App(): React.ReactElement {
     elements, elementsRef, setElements, pushHistory, snapToGrid, canvasWidthPx, canvasHeightPx, containerRef, handleUndo, handleRedo,
   });
 
-  const [appVersion, setAppVersion] = useState<string>('3.0.0');
+  const [appVersion, setAppVersion] = useState<string>('3.0.1');
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
-  const [wizardTab, setWizardTab] = useState<string>('pc');
+  const [wizardTab, setWizardTab] = useState<string>('esp32');
   const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(1.5);
 
   const {
@@ -132,7 +132,7 @@ export default function App(): React.ReactElement {
 
   const {
     fileInputRef, layoutFileInputRef, addTextElement, addQRElement, addBarcodeElement, addLineElement,
-    addRectangleElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
+    addRectangleElement, addPlaceholderElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
     handleClearCanvas, handlePushToEsp32, updateSelectedElement, updateQRHelper, sendToBack, bringToFront,
   } = useElementActions({
     elements, elementsRef, setElements, pushHistory, selectedPreset, setSelectedPreset, setSelectedTemplateId, selectedId, setSelectedId, setHistory, setHistoryIndex, setPrintStatus,
@@ -146,7 +146,7 @@ export default function App(): React.ReactElement {
   };
 
   const sidebarProps = {
-    density, setDensity, copies, setCopies, invertColors, setInvertColors, useBrowserBt, setUseBrowserBt, elements, setShowBatchModal, setShowWizardModal, collapsedPrintParams, setCollapsedPrintParams, handleGeneratePreview, selectedPreset, setSelectedPreset, isPortraitView, setIsPortraitView, templates, selectedTemplateId, setSelectedTemplateId, setElements, setHistory, setHistoryIndex, handleExportLayout, layoutFileInputRef, handleImportLayout, handleClearCanvas, handlePushToEsp32, snapToGrid, setSnapToGrid, showGrid, setShowGrid, collapsedPresets, setCollapsedPresets, theme, setTheme, zoomScale, setZoomScale, addTextElement, addQRElement, addBarcodeElement, addLineElement, addRectangleElement, fileInputRef, handleImageUpload, collapsedAddElements, setCollapsedAddElements, iconSearch, setIconSearch, iconResults, isSearchingIcons, addIconElement, handleSelectWebIcon, collapsedIcons, setCollapsedIcons, selectedElement, updateSelectedElement, updateQRHelper, deleteSelectedElement, nudgeSelectedElement, sendToBack, bringToFront, pushHistory, elementsRef
+    density, setDensity, copies, setCopies, invertColors, setInvertColors, useBrowserBt, setUseBrowserBt, elements, setShowBatchModal, setShowWizardModal, collapsedPrintParams, setCollapsedPrintParams, handleGeneratePreview, selectedPreset, setSelectedPreset, isPortraitView, setIsPortraitView, templates, selectedTemplateId, setSelectedTemplateId, setElements, setHistory, setHistoryIndex, handleExportLayout, layoutFileInputRef, handleImportLayout, handleClearCanvas, handlePushToEsp32, snapToGrid, setSnapToGrid, showGrid, setShowGrid, collapsedPresets, setCollapsedPresets, theme, setTheme, zoomScale, setZoomScale, addTextElement, addQRElement, addBarcodeElement, addLineElement, addRectangleElement, addPlaceholderElement, fileInputRef, handleImageUpload, collapsedAddElements, setCollapsedAddElements, iconSearch, setIconSearch, iconResults, isSearchingIcons, addIconElement, handleSelectWebIcon, collapsedIcons, setCollapsedIcons, selectedElement, updateSelectedElement, updateQRHelper, deleteSelectedElement, nudgeSelectedElement, sendToBack, bringToFront, pushHistory, elementsRef
   };
 
   return (
