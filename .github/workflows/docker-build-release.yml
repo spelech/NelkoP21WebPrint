@@ -65,16 +65,6 @@ jobs:
           DEFAULT_BUMP: patch
           RELEASE_BRANCHES: master,main
 
-      - name: Create Official GitHub Release
-        if: steps.bump_version.outputs.new_tag
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.bump_version.outputs.new_tag }}
-          name: Release ${{ steps.bump_version.outputs.new_tag }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # Job 3: Build & Push Docker Container to GHCR using SemVer Tags
   build-and-push-docker:
     needs: [unit-tests, semantic-versioning]
@@ -121,5 +111,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

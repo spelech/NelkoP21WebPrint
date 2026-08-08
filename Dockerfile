@@ -4,7 +4,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -26,7 +26,9 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy VERSION file & backend code
+ARG APP_VERSION=3.0.0
 COPY VERSION ./VERSION
+RUN echo "${APP_VERSION}" > ./VERSION
 COPY backend/app ./app
 
 # Copy built frontend static assets into backend/static
