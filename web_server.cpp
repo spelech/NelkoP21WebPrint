@@ -198,6 +198,17 @@ const char APP_HTML[] PROGMEM = R"raw(
                 </div>
                 <button class="btn-primary" onclick="printLabel()">Print Label Direct</button>
             </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div class="card-title" style="margin-bottom:0;">Custom JSON Template Management</div>
+                    <div id="tpl-status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#6366f122; color:#818cf8; border:1px solid #6366f144;">Checking...</div>
+                </div>
+                <input type="file" id="tpl-file-input" accept=".json" style="display:none;" onchange="uploadSelectedTemplate(event)">
+                <button class="btn-secondary" onclick="document.getElementById('tpl-file-input').click()">Upload Nelko JSON Template File</button>
+                <button class="btn-secondary" onclick="downloadActiveTemplate()">Export Active ESP32 Template</button>
+                <button class="btn-secondary" style="border-color:#ef444466; color:#ef4444;" onclick="resetTemplate()">Reset to Default Layout</button>
+            </div>
         </div>
 
         <!-- TAB 2: Config & Diagnostics -->
@@ -337,6 +348,93 @@ const char APP_HTML[] PROGMEM = R"raw(
             })
             .then(() => { showToast('Saved! Reconnecting device...'); });
         }
+
+        function checkTemplateStatus() {
+            fetch('/api/template/load')
+                .then(res => res.json())
+                .then(data => {
+                    const badge = document.getElementById('tpl-status-badge');
+                    if (!badge) return;
+                    if (data && Object.keys(data).length > 0) {
+                        badge.textContent = 'Custom JSON Template';
+                        badge.style.background = '#10b98122';
+                        badge.style.color = '#10b981';
+                        badge.style.borderColor = '#10b98144';
+                    } else {
+                        badge.textContent = 'Default Built-in Layout';
+                        badge.style.background = '#6366f122';
+                        badge.style.color = '#818cf8';
+                        badge.style.borderColor = '#6366f144';
+                    }
+                })
+                .catch(err => {
+                    const badge = document.getElementById('tpl-status-badge');
+                    if (badge) {
+                        badge.textContent = 'Default Built-in Layout';
+                        badge.style.background = '#6366f122';
+                        badge.style.color = '#818cf8';
+                        badge.style.borderColor = '#6366f144';
+                    }
+                });
+        }
+
+        function uploadSelectedTemplate(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                fetch('/api/template/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: content
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        showToast('Template uploaded successfully!');
+                        checkTemplateStatus();
+                    } else {
+                        showToast('Upload failed: ' + (data.error || 'Invalid template'));
+                    }
+                })
+                .catch(err => { showToast('Template upload error!'); });
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function downloadActiveTemplate() {
+            fetch('/api/template/load')
+                .then(res => res.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'esp32-label-template.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('Exported active template!');
+                })
+                .catch(err => { showToast('Error exporting template!'); });
+        }
+
+        function resetTemplate() {
+            if (!confirm('Are you sure you want to reset to default layout?')) return;
+            fetch('/api/template/reset', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    showToast('Reset to default layout!');
+                    checkTemplateStatus();
+                })
+                .catch(err => { showToast('Reset error!'); });
+        }
+
+        document.addEventListener('DOMContentLoaded', checkTemplateStatus);
+        checkTemplateStatus();
 
         // Live Log Stream
         const sse = new EventSource(`http://${window.location.hostname}:8080/logs`);
