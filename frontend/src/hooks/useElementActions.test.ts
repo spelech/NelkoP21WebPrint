@@ -49,7 +49,7 @@ describe('useElementActions', () => {
 
   it('clears canvas when confirmed', () => {
     const windowConfirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
-    const elements: LabelElement[] = [{ id: 1, type: 'text', content: 'test', x: 0, y: 0 }];
+    const elements: LabelElement[] = [{ id: 1, type: 'text', content: 'test', x: 0, y: 0, fontSize: 16 }];
     const setElements = vi.fn();
     const pushHistory = vi.fn();
 
