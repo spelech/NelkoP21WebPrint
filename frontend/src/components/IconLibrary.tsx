@@ -1,5 +1,24 @@
 import React from 'react';
 import { Sparkles, ChevronDown, RefreshCw } from 'lucide-react';
+import { MdiCategories } from '../utils/mdiIcons';
+
+export interface IconResult {
+  name: string;
+  path?: string;
+  source: 'offline' | 'online';
+}
+
+export interface IconLibraryProps {
+  iconSearch: string;
+  setIconSearch: (search: string) => void;
+  iconResults: IconResult[];
+  isSearchingIcons: boolean;
+  addIconElement: (name: string, path: string) => void;
+  handleSelectWebIcon: (iconName: string) => void;
+  collapsedIcons: boolean;
+  setCollapsedIcons: (collapsed: boolean) => void;
+  MDI_OFFLINE: MdiCategories;
+}
 
 export default function IconLibrary({
   iconSearch,
@@ -11,7 +30,7 @@ export default function IconLibrary({
   collapsedIcons,
   setCollapsedIcons,
   MDI_OFFLINE
-}) {
+}: IconLibraryProps): React.ReactElement {
   return (
     <div className="mt-4 flex flex-col gap-3">
       <button
@@ -57,7 +76,7 @@ export default function IconLibrary({
                   <button
                     key={`res-${i}`}
                     onClick={() => {
-                      if (ic.source === 'offline') {
+                      if (ic.source === 'offline' && ic.path) {
                         addIconElement(ic.name, ic.path);
                       } else {
                         handleSelectWebIcon(ic.name);
@@ -66,7 +85,7 @@ export default function IconLibrary({
                     className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/50 hover:bg-slate-800 border border-slate-800 transition relative"
                     title={ic.name}
                   >
-                    {ic.source === 'offline' ? (
+                    {ic.source === 'offline' && ic.path ? (
                       <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="currentColor">
                         <path d={ic.path} />
                       </svg>

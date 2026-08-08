@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-// @ts-ignore
 import { MDI_OFFLINE } from '../utils/mdiIcons';
 
 export interface IconResult {

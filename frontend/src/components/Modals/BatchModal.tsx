@@ -1,5 +1,25 @@
-import React from 'react';
-import { Sparkles, Upload, RefreshCw } from 'lucide-react';
+import React, { RefObject, ChangeEvent } from 'react';
+import { Sparkles, Upload } from 'lucide-react';
+import { BatchJob } from '../../types';
+
+export interface BatchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  csvHeaders: string[];
+  setCsvHeaders: (headers: string[]) => void;
+  csvRows: Record<string, string>[];
+  setCsvRows: (rows: Record<string, string>[]) => void;
+  csvFilename: string;
+  setCsvFilename: (filename: string) => void;
+  variableMapping: Record<string, string>;
+  setVariableMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  batchPreviewIndex: number;
+  setBatchPreviewIndex: React.Dispatch<React.SetStateAction<number>>;
+  getTemplateVariables: () => string[];
+  handleExecuteBatchPrint: (jobs: BatchJob[]) => Promise<void>;
+  parseCSV: (csvText: string) => { headers: string[]; rows: Record<string, string>[] };
+  csvFileInputRef: RefObject<HTMLInputElement>;
+}
 
 export default function BatchModal({
   isOpen,
@@ -18,7 +38,7 @@ export default function BatchModal({
   handleExecuteBatchPrint,
   parseCSV,
   csvFileInputRef
-}) {
+}: BatchModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 
   return (
@@ -53,12 +73,14 @@ export default function BatchModal({
                 ref={csvFileInputRef}
                 accept=".csv"
                 className="hidden"
-                onChange={(e) => {
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   const reader = new FileReader();
                   reader.onload = (evt) => {
-                    const { headers, rows } = parseCSV(evt.target.result);
+                    const content = evt.target?.result;
+                    if (typeof content !== 'string') return;
+                    const { headers, rows } = parseCSV(content);
                     if (headers.length === 0 || rows.length === 0) {
                       alert("Invalid or empty CSV file.");
                       return;
@@ -69,7 +91,7 @@ export default function BatchModal({
                     
                     // Auto-map matching variable names
                     const templateVars = getTemplateVariables();
-                    const initialMapping = {};
+                    const initialMapping: Record<string, string> = {};
                     templateVars.forEach(v => {
                       const match = headers.find(h => h.toLowerCase() === v.toLowerCase());
                       if (match) initialMapping[v] = match;
@@ -182,10 +204,12 @@ export default function BatchModal({
           {csvRows.length > 0 && (
             <button 
               onClick={async () => {
-                const jobs = csvRows.map(row => {
-                  const variables = {};
+                const jobs: BatchJob[] = csvRows.map(row => {
+                  const variables: Record<string, string> = {};
                   Object.entries(variableMapping).forEach(([k, col]) => {
-                    variables[k] = row[col] || '';
+                    if (col) {
+                      variables[k] = row[col] || '';
+                    }
                   });
                   return { variables, copies: 1 };
                 });

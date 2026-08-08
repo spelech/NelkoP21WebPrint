@@ -98,7 +98,7 @@ export default function App(): React.ReactElement {
     elements, elementsRef, setElements, pushHistory, snapToGrid, canvasWidthPx, canvasHeightPx, containerRef, handleUndo, handleRedo,
   });
 
-  const [appVersion, setAppVersion] = useState<string>('1.1.0');
+  const [appVersion, setAppVersion] = useState<string>('2.2.0');
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [wizardTab, setWizardTab] = useState<string>('pc');
   const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(1.5);

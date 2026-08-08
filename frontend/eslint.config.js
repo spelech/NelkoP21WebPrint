@@ -1,10 +1,15 @@
 import js from "@eslint/js";
 import react from "eslint-plugin-react";
+import tseslint from "typescript-eslint";
 
-export default [
-  js.configs.recommended,
+export default tseslint.config(
   {
-    files: ["**/*.jsx", "**/*.js"],
+    ignores: ["dist/**", "coverage/**", "node_modules/**"],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
     plugins: {
       react,
     },
@@ -33,14 +38,14 @@ export default [
         TextEncoder: "readonly",
         Uint8Array: "readonly",
         Promise: "readonly",
-        // Common JS/React globals
         React: "readonly",
       },
     },
     rules: {
-      "no-undef": "error",
-      "react/jsx-no-undef": "error",
-      "no-unused-vars": "warn",
+      "no-undef": "off",
+      "react/jsx-no-undef": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     },
-  },
-];
+  }
+);

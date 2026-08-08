@@ -1,5 +1,17 @@
-import React from 'react';
+import React, { RefObject, ChangeEvent } from 'react';
 import { Plus, ChevronDown, Type, QrCode, Barcode, Minus, Square, Image as ImageIcon } from 'lucide-react';
+
+export interface AddElementsProps {
+  addTextElement: () => void;
+  addQRElement: () => void;
+  addBarcodeElement: () => void;
+  addLineElement: () => void;
+  addRectangleElement: () => void;
+  fileInputRef: RefObject<HTMLInputElement>;
+  handleImageUpload: (e: ChangeEvent<HTMLInputElement>) => void;
+  collapsedAddElements: boolean;
+  setCollapsedAddElements: (collapsed: boolean) => void;
+}
 
 export default function AddElements({
   addTextElement,
@@ -11,7 +23,7 @@ export default function AddElements({
   handleImageUpload,
   collapsedAddElements,
   setCollapsedAddElements
-}) {
+}: AddElementsProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-3">
       <button

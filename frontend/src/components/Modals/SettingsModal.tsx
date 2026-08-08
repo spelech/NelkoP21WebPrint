@@ -1,5 +1,20 @@
 import React from 'react';
-import { Settings, Wifi } from 'lucide-react';
+import { Settings } from 'lucide-react';
+
+export interface DriverConfig {
+  driver_type: 'tcp' | 'spp' | 'mock' | string;
+  tcp_host: string;
+  tcp_port: number;
+  bt_mac: string;
+}
+
+export interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  driverConfig: DriverConfig;
+  setDriverConfig: (config: DriverConfig) => void;
+  handleSaveConfig: () => void;
+}
 
 export default function SettingsModal({ 
   isOpen, 
@@ -7,7 +22,7 @@ export default function SettingsModal({
   driverConfig, 
   setDriverConfig, 
   handleSaveConfig 
-}) {
+}: SettingsModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 
   return (
@@ -48,7 +63,7 @@ export default function SettingsModal({
                 <input 
                   type="number"
                   value={driverConfig.tcp_port}
-                  onChange={(e) => setDriverConfig({ ...driverConfig, tcp_port: parseInt(e.target.value) || 9100 })}
+                  onChange={(e) => setDriverConfig({ ...driverConfig, tcp_port: parseInt(e.target.value, 10) || 9100 })}
                   className="w-full p-2.5 rounded-xl glass-input text-sm"
                 />
               </div>

@@ -1,10 +1,10 @@
 /**
  * Client-Side TSPL / TSPL2 Generator & 1-Bit Monochrome Rasterizer
- * Runs 100% in the web browser (JS) for direct Web Bluetooth / Web Serial printing.
+ * Runs 100% in the web browser (JS/TS) for direct Web Bluetooth / Web Serial printing.
  */
 
 // 16x16 Bayer Matrix for ordered dithering
-const BAYER_16x16 = [
+const BAYER_16x16: number[][] = [
   [  0, 128,  32, 160,   8, 136,  40, 168,   2, 130,  34, 162,  10, 138,  42, 170],
   [192,  64, 224,  96, 200,  72, 232, 104, 194,  66, 226,  98, 202,  74, 234, 106],
   [ 48, 176,  16, 144,  56, 184,  24, 152,  50, 178,  18, 146,  58, 186,  26, 154],
@@ -23,7 +23,7 @@ const BAYER_16x16 = [
   [254, 127, 223,  95, 255, 119, 221,  87, 253, 125, 221,  93, 245, 117, 213,  85]
 ];
 
-export function mmToDots(mm, dpi = 203) {
+export function mmToDots(mm: number, dpi: number = 203): number {
   return Math.round((mm * dpi) / 25.4);
 }
 
@@ -31,7 +31,16 @@ export function mmToDots(mm, dpi = 203) {
  * Converts an HTML5 Canvas to a 1-bit packed TSPL bitmap Uint8Array payload.
  * Automatically rotates landscape canvases 90 degrees clockwise to align with physical 14mm printhead.
  */
-export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, density = 3, copies = 1, ditherMethod = 'threshold', invertColors = false) {
+export function convertCanvasToTsplBytes(
+  canvas: HTMLCanvasElement,
+  widthMm: number,
+  heightMm: number,
+  gapMm: number = 5,
+  density: number = 3,
+  copies: number = 1,
+  ditherMethod: string = 'threshold',
+  invertColors: boolean = false
+): Uint8Array {
   let srcCanvas = canvas;
   let printWidthMm = widthMm;
   let printHeightMm = heightMm;
@@ -43,16 +52,22 @@ export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, d
     rotCanvas.height = canvas.width;
     const rotCtx = rotCanvas.getContext('2d');
     
-    rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
-    rotCtx.rotate(Math.PI / 2); // 90 deg clockwise
-    rotCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-    
-    srcCanvas = rotCanvas;
-    printWidthMm = heightMm;
-    printHeightMm = widthMm;
+    if (rotCtx) {
+      rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+      rotCtx.rotate(Math.PI / 2); // 90 deg clockwise
+      rotCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+      
+      srcCanvas = rotCanvas;
+      printWidthMm = heightMm;
+      printHeightMm = widthMm;
+    }
   }
 
   const ctx = srcCanvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to get 2D context from canvas');
+  }
+
   const w = srcCanvas.width;
   const h = srcCanvas.height;
   const imgData = ctx.getImageData(0, 0, w, h);
@@ -78,7 +93,7 @@ export function convertCanvasToTsplBytes(canvas, widthMm, heightMm, gapMm = 5, d
           // Grayscale luminance
           const lum = a < 128 ? 255 : Math.round(0.299 * r + 0.587 * g + 0.114 * b);
 
-          let isBlack;
+          let isBlack: boolean;
           if (ditherMethod === 'bayer16') {
             const bayerVal = BAYER_16x16[y % 16][xPixel % 16];
             isBlack = lum < bayerVal;

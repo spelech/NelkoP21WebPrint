@@ -1,7 +1,13 @@
 import React from 'react';
 import { Sparkles, RefreshCw } from 'lucide-react';
 
-export default function PreviewModal({ isOpen, onClose, previewUrl }) {
+export interface PreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  previewUrl: string | null;
+}
+
+export default function PreviewModal({ isOpen, onClose, previewUrl }: PreviewModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 
   return (

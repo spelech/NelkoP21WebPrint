@@ -1,7 +1,12 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 
-export const THEMES = [
+export interface ThemeOption {
+  id: string;
+  name: string;
+}
+
+export const THEMES: ThemeOption[] = [
   { id: 'slate', name: 'Sleek Slate (Dark)' },
   { id: 'indigo', name: 'Deep Indigo' },
   { id: 'emerald', name: 'Emerald Forest' },
@@ -9,7 +14,12 @@ export const THEMES = [
   { id: 'light', name: 'Minimal Light' }
 ];
 
-export default function ThemeSelector({ theme, setTheme }) {
+export interface ThemeSelectorProps {
+  theme: string;
+  setTheme: (theme: string) => void;
+}
+
+export default function ThemeSelector({ theme, setTheme }: ThemeSelectorProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">

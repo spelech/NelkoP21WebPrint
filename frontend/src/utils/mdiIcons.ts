@@ -1,4 +1,11 @@
-export const MDI_OFFLINE = {
+export interface MdiIcon {
+  name: string;
+  path: string;
+}
+
+export type MdiCategories = Record<string, MdiIcon[]>;
+
+export const MDI_OFFLINE: MdiCategories = {
   "Home Automation": [
     { name: "home", path: "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" },
     { name: "lightbulb", path: "M12 2A7 7 0 0 0 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74A7 7 0 0 0 12 2M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1z" },

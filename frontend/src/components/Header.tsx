@@ -1,5 +1,24 @@
 import React from 'react';
 import { Printer, RefreshCw, Bluetooth, BluetoothSearching, Undo2, Redo2 } from 'lucide-react';
+import { LabelElement } from '../types';
+
+export interface HeaderProps {
+  appVersion: string;
+  historyIndex: number;
+  history: LabelElement[][];
+  handleUndo: () => void;
+  handleRedo: () => void;
+  useBrowserBt: boolean;
+  setUseBrowserBt: (useBt: boolean) => void;
+  browserBtConnected: boolean;
+  browserBtDeviceName: string;
+  browserBtConnecting: boolean;
+  handleConnectBrowserBt: () => void;
+  handleDisconnectBrowserBt: () => void;
+  setShowWizardModal: (show: boolean) => void;
+  handlePrint: () => void;
+  isPrinting: boolean;
+}
 
 export default function Header({
   appVersion,
@@ -17,7 +36,7 @@ export default function Header({
   setShowWizardModal,
   handlePrint,
   isPrinting
-}) {
+}: HeaderProps): React.ReactElement {
   return (
     <header className="h-14 md:h-16 border-b border-slate-800 glass-panel px-3 md:px-6 flex items-center justify-between z-10 shrink-0">
       {/* Title & Logo */}

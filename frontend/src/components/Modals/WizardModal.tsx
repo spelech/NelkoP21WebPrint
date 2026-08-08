@@ -1,17 +1,27 @@
 import React from 'react';
 import { Bluetooth, Monitor, Smartphone, Wifi, AlertTriangle, Settings } from 'lucide-react';
 
+export interface WizardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  browserBtConnected: boolean;
+  browserBtDeviceName: string;
+  handleConnectBrowserBt: () => void;
+  wizardTab: 'pc' | 'mobile' | 'bridge' | string;
+  setWizardTab: (tab: 'pc' | 'mobile' | 'bridge' | string) => void;
+  setUseBrowserBt: (useBt: boolean) => void;
+  setShowSettings: (show: boolean) => void;
+}
+
 export default function WizardModal({
   isOpen,
   onClose,
-  browserBtConnected,
-  browserBtDeviceName,
   handleConnectBrowserBt,
   wizardTab,
   setWizardTab,
   setUseBrowserBt,
   setShowSettings
-}) {
+}: WizardModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 
   return (

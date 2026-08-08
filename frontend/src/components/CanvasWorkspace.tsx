@@ -1,14 +1,44 @@
-import React from 'react';
+import React, { RefObject, MouseEvent, TouchEvent } from 'react';
 import { QrCode } from 'lucide-react';
+import { LabelElement } from '../types';
+
+export interface AlignmentGuide {
+  type: 'vertical' | 'horizontal';
+  x?: number;
+  y?: number;
+}
+
+export interface QrCacheItem {
+  url: string;
+  img: HTMLImageElement;
+}
+
+export interface CanvasWorkspaceProps {
+  zoomScale: number;
+  setZoomScale: React.Dispatch<React.SetStateAction<number>>;
+  activeWidthMm: number;
+  activeHeightMm: number;
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+  isPortraitView: boolean;
+  showGrid: boolean;
+  containerRef: RefObject<HTMLDivElement>;
+  setSelectedId: (id: number | null) => void;
+  handleTouchStart: (e: TouchEvent<HTMLDivElement>) => void;
+  handleTouchMove: (e: TouchEvent<HTMLDivElement>) => void;
+  handleTouchEnd: () => void;
+  draggingId: number | null;
+  alignmentGuides: AlignmentGuide[];
+  elements: LabelElement[];
+  selectedId: number | null;
+  handleStartDrag: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>, id: number) => void;
+  qrCache: Record<string, QrCacheItem>;
+}
 
 export default function CanvasWorkspace({
   zoomScale,
-  setZoomScale,
-  activeWidthMm,
-  activeHeightMm,
   canvasWidthPx,
   canvasHeightPx,
-  isPortraitView,
   showGrid,
   containerRef,
   setSelectedId,
@@ -21,7 +51,7 @@ export default function CanvasWorkspace({
   selectedId,
   handleStartDrag,
   qrCache
-}) {
+}: CanvasWorkspaceProps): React.ReactElement {
   return (
     <main className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-center relative overflow-auto pb-20 md:pb-0">
       {/* Thermal Label Workspace Simulation */}
@@ -102,7 +132,7 @@ export default function CanvasWorkspace({
                       style={{ 
                         fontFamily: el.fontFamily === 'monospace' ? 'monospace' : 'sans-serif',
                         fontSize: `${el.fontSize || 22}px`, 
-                        fontWeight: el.bold ? 'bold' : 'normal',
+                        fontWeight: el.fontStyle === 'bold' ? 'bold' : 'normal',
                         textAlign: el.align || 'center',
                         display: 'block',
                         whiteSpace: 'nowrap'
@@ -230,24 +260,6 @@ export default function CanvasWorkspace({
                         onMouseDown={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          // trigger resize start via parent event
-                          const startResize = (moveEvent) => {
-                            const rect = containerRef.current.getBoundingClientRect();
-                            const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
-                            const clientY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
-                            const currentPxX = ((clientX - rect.left) / rect.width) * 100;
-                            const currentPxY = ((clientY - rect.top) / rect.height) * 100;
-                            
-                            const newWidth = Math.max(5, Math.round(((currentPxX - el.x) / 50) * canvasWidthPx));
-                            const newHeight = Math.max(5, Math.round(((currentPxY - el.y) / 50) * canvasHeightPx));
-                            
-                            const ratio = (el.height || 60) / (el.width || 60);
-                            if (el.type === 'image' && el.keepRatio !== false && ratio) {
-                              setSelectedId(el.id);
-                              // update width and compute height based on lock aspect ratio
-                              // We trigger direct element update via state dispatch inside parent or trigger resize handler props
-                            }
-                          };
                         }}
                         className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-indigo-600 border-2 border-white rounded-full cursor-se-resize shadow-md transform translate-x-1/2 translate-y-1/2 z-50 flex items-center justify-center"
                         title="Drag to resize element width & height"

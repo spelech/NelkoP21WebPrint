@@ -1,5 +1,20 @@
 import React from 'react';
 import { Sliders, ChevronDown, Upload, Eye } from 'lucide-react';
+import { LabelElement } from '../types';
+
+export interface PrintParametersProps {
+  density: number;
+  setDensity: (density: number) => void;
+  copies: number;
+  setCopies: (copies: number) => void;
+  invertColors: boolean;
+  setInvertColors: (invert: boolean) => void;
+  elements: LabelElement[];
+  setShowBatchModal: (show: boolean) => void;
+  collapsedPrintParams: boolean;
+  setCollapsedPrintParams: (collapsed: boolean) => void;
+  handleGeneratePreview: () => void;
+}
 
 export default function PrintParameters({
   density,
@@ -13,7 +28,7 @@ export default function PrintParameters({
   collapsedPrintParams,
   setCollapsedPrintParams,
   handleGeneratePreview
-}) {
+}: PrintParametersProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-3">
       <button
@@ -37,7 +52,7 @@ export default function PrintParameters({
                 min="0" 
                 max="15" 
                 value={density}
-                onChange={(e) => setDensity(parseInt(e.target.value))}
+                onChange={(e) => setDensity(parseInt(e.target.value, 10))}
                 className="w-full accent-indigo-500"
               />
             </div>
@@ -48,7 +63,7 @@ export default function PrintParameters({
                 min="1" 
                 max="100" 
                 value={copies}
-                onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                onChange={(e) => setCopies(parseInt(e.target.value, 10) || 1)}
                 className="w-full p-2 rounded-xl glass-input text-xs"
               />
             </div>

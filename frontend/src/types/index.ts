@@ -37,6 +37,7 @@ export interface QRElement extends BaseElement {
   size?: number;
   qrHelperType?: string;
   qrHelperFields?: Record<string, string>;
+  imgObject?: HTMLImageElement;
 }
 
 export interface LineElement extends BaseElement {

@@ -1,6 +1,45 @@
-import React from 'react';
+import React, { RefObject, ChangeEvent } from 'react';
 import { Grid, ChevronDown, RotateCw, Wifi } from 'lucide-react';
 import ThemeSelector from './ThemeSelector';
+import { LabelPreset, LabelElement } from '../types';
+
+export interface TemplateItem {
+  id: number;
+  name: string;
+  width_mm: number;
+  height_mm: number;
+  layout_json?: string | LabelElement[];
+}
+
+export interface LayoutPresetsProps {
+  selectedPreset: LabelPreset;
+  setSelectedPreset: (preset: LabelPreset) => void;
+  isPortraitView: boolean;
+  setIsPortraitView: (isPortrait: boolean) => void;
+  templates: TemplateItem[];
+  selectedTemplateId: number | string | null;
+  setSelectedTemplateId: (id: number | string | null) => void;
+  setElements: React.Dispatch<React.SetStateAction<LabelElement[]>>;
+  setHistory: (history: LabelElement[][]) => void;
+  setHistoryIndex: (index: number) => void;
+  elements: LabelElement[];
+  handleExportLayout: () => void;
+  layoutFileInputRef: RefObject<HTMLInputElement>;
+  handleImportLayout: (e: ChangeEvent<HTMLInputElement>) => void;
+  handleClearCanvas: () => void;
+  handlePushToEsp32: () => void;
+  snapToGrid: boolean;
+  setSnapToGrid: (snap: boolean) => void;
+  showGrid: boolean;
+  setShowGrid: (show: boolean) => void;
+  collapsedPresets: boolean;
+  setCollapsedPresets: (collapsed: boolean) => void;
+  theme: string;
+  setTheme: (theme: string) => void;
+  PRESETS: LabelPreset[];
+  zoomScale: number;
+  setZoomScale: React.Dispatch<React.SetStateAction<number>>;
+}
 
 export default function LayoutPresets({
   selectedPreset,
@@ -13,7 +52,6 @@ export default function LayoutPresets({
   setElements,
   setHistory,
   setHistoryIndex,
-  elements,
   handleExportLayout,
   layoutFileInputRef,
   handleImportLayout,
@@ -30,7 +68,7 @@ export default function LayoutPresets({
   PRESETS,
   zoomScale,
   setZoomScale
-}) {
+}: LayoutPresetsProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-3">
       <button
@@ -97,7 +135,7 @@ export default function LayoutPresets({
                     setHistory([[]]);
                     setHistoryIndex(0);
                   } else {
-                    const t = templates.find(item => item.id === parseInt(tid));
+                    const t = templates.find(item => item.id === parseInt(tid, 10));
                     if (t) {
                       const foundPreset = PRESETS.find(p => p.width === t.width_mm && p.height === t.height_mm) || {
                         name: `${t.width_mm}x${t.height_mm} mm (Custom)`,
@@ -107,7 +145,7 @@ export default function LayoutPresets({
                       };
                       setSelectedPreset(foundPreset);
                       
-                      let initialElements = [];
+                      let initialElements: LabelElement[] = [];
                       if (t.layout_json) {
                         try {
                           initialElements = typeof t.layout_json === 'string' ? JSON.parse(t.layout_json) : t.layout_json;
