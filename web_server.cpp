@@ -135,7 +135,7 @@ const char APP_HTML[] PROGMEM = R"raw(
         <div class="header">
             <h1 style="display:flex; align-items:center;">
                 <span>Nelko P21 Wireless Bridge</span>
-                <span style="font-size:0.75rem; font-weight:700; color:#e0e7ff; background:#312e81; border:1px solid #6366f188; margin-left:10px; padding:3px 10px; border-radius:8px; -webkit-text-fill-color: initial; display:inline-block;">v2.0.1</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#e0e7ff; background:#312e81; border:1px solid #6366f188; margin-left:10px; padding:3px 10px; border-radius:8px; -webkit-text-fill-color: initial; display:inline-block;">v2.0.2</span>
             </h1>
             <div id="status-badge" style="padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:600; background:#ef444422; color:#ef4444; border:1px solid #ef444444;">Offline</div>
         </div>
@@ -436,8 +436,34 @@ const char APP_HTML[] PROGMEM = R"raw(
                 .catch(err => { showToast('Reset error!'); });
         }
 
-        document.addEventListener('DOMContentLoaded', checkTemplateStatus);
+        function checkPrinterStatus() {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    const badge = document.getElementById('status-badge');
+                    if (!badge) return;
+                    if (data.connected) {
+                        badge.textContent = 'Connected: ' + data.mac;
+                        badge.style.background = '#10b98122';
+                        badge.style.color = '#10b981';
+                        badge.style.borderColor = '#10b98144';
+                    } else {
+                        badge.textContent = 'Offline (' + data.mac + ')';
+                        badge.style.background = '#ef444422';
+                        badge.style.color = '#ef4444';
+                        badge.style.borderColor = '#ef444444';
+                    }
+                })
+                .catch(() => {});
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkTemplateStatus();
+            checkPrinterStatus();
+            setInterval(checkPrinterStatus, 3000);
+        });
         checkTemplateStatus();
+        checkPrinterStatus();
 
         // Live Log Stream
         const sse = new EventSource(`http://${window.location.hostname}:8080/logs`);
@@ -520,6 +546,17 @@ void handleBtSaveApi() {
     webServer.send(400, "application/json", "{\"error\":\"Invalid MAC address\"}");
 }
 
+void handleStatusApi() {
+    sendCORSHeaders();
+    String json = "{";
+    json += "\"connected\":" + String(isPrinterConnected() ? "true" : "false") + ",";
+    json += "\"mac\":\"" + getPrinterMACString() + "\",";
+    json += "\"version\":\"" + String(APP_VERSION) + "\",";
+    json += "\"ip\":\"" + WiFi.localIP().toString() + "\"";
+    json += "}";
+    webServer.send(200, "application/json", json);
+}
+
 String getStoredTemplateJSON() {
     Preferences prefs;
     prefs.begin("label-tpl", true);
@@ -543,8 +580,19 @@ void clearStoredTemplateJSON() {
     prefs.end();
 }
 
+static void sendCORSHeaders() {
+    webServer.sendHeader("Access-Control-Allow-Origin", "*");
+    webServer.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    webServer.sendHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+void handleOptionsCORS() {
+    sendCORSHeaders();
+    webServer.send(204, "text/plain", "");
+}
+
 void handleTemplateSaveApi() {
-    if (!checkAuth()) return;
+    sendCORSHeaders();
     String body = "";
     if (webServer.hasArg("plain")) {
         body = webServer.arg("plain");
@@ -553,6 +601,7 @@ void handleTemplateSaveApi() {
     }
 
     if (body.length() > 0 && saveStoredTemplateJSON(body)) {
+        Logger::log("Template Save: Stored dynamic JSON layout (%d bytes) to NVS.", body.length());
         webServer.send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
         webServer.send(400, "application/json", "{\"error\":\"Invalid template JSON\"}");
@@ -560,7 +609,7 @@ void handleTemplateSaveApi() {
 }
 
 void handleTemplateLoadApi() {
-    if (!checkAuth()) return;
+    sendCORSHeaders();
     String storedJson = getStoredTemplateJSON();
     if (storedJson.length() == 0) {
         storedJson = "{}";
@@ -569,13 +618,15 @@ void handleTemplateLoadApi() {
 }
 
 void handleTemplateResetApi() {
-    if (!checkAuth()) return;
+    sendCORSHeaders();
     clearStoredTemplateJSON();
+    Logger::log("Template Reset: Cleared NVS layout template. Restored default layout.");
     webServer.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 void handlePrintApi() {
-    if (!checkAuth()) return;
+    sendCORSHeaders();
+    Logger::log("Received POST /api/print request from client.");
     if (webServer.hasArg("plain")) {
         String body = webServer.arg("plain");
 
@@ -632,7 +683,9 @@ void handlePrintApi() {
 
         String storedJson = getStoredTemplateJSON();
         String tsplPayload;
-        if (storedJson.length() > 0) {
+        if (body.indexOf("\"elements\"") != -1) {
+            tsplPayload = generateTSPLFromJSON(body, req);
+        } else if (storedJson.length() > 0) {
             tsplPayload = generateTSPLFromJSON(storedJson, req);
         } else {
             tsplPayload = generateTSPLStream(req);
@@ -645,11 +698,63 @@ void handlePrintApi() {
             webServer.send(200, "application/json", "{\"status\":\"success\"}");
         } else {
             Logger::log("Direct API Print error: Printer is offline.");
-            webServer.send(503, "application/json", "{\"error\":\"Printer offline\"}");
+            webServer.send(530, "application/json", "{\"error\":\"Printer offline\"}");
         }
         return;
     }
     webServer.send(400, "application/json", "{\"error\":\"Invalid payload\"}");
+}
+
+void handlePrintCanvasApi() {
+    sendCORSHeaders();
+    Logger::log("Received POST /api/print/canvas print request from web dashboard.");
+
+    String body = "";
+    if (webServer.hasArg("plain")) {
+        body = webServer.arg("plain");
+    }
+
+    SimpleLabelRequest req;
+    req.widthMm = 40.0f;
+    req.heightMm = 14.0f;
+    req.gapMm = 5.0f;
+    req.copies = 1;
+
+    if (body.indexOf("width_mm") != -1) {
+        int idx = body.indexOf("\"width_mm\"");
+        int colon = body.indexOf(':', idx);
+        if (colon != -1) req.widthMm = body.substring(colon + 1).toFloat();
+    }
+    if (body.indexOf("height_mm") != -1) {
+        int idx = body.indexOf("\"height_mm\"");
+        int colon = body.indexOf(':', idx);
+        if (colon != -1) req.heightMm = body.substring(colon + 1).toFloat();
+    }
+    if (body.indexOf("copies") != -1) {
+        int idx = body.indexOf("\"copies\"");
+        int colon = body.indexOf(':', idx);
+        if (colon != -1) req.copies = body.substring(colon + 1).toInt();
+    }
+
+    String tsplPayload;
+    String storedJson = getStoredTemplateJSON();
+    if (body.indexOf("\"elements\"") != -1) {
+        tsplPayload = generateTSPLFromJSON(body, req);
+    } else if (storedJson.length() > 0) {
+        tsplPayload = generateTSPLFromJSON(storedJson, req);
+    } else {
+        tsplPayload = generateTSPLStream(req);
+    }
+
+    if (isPrinterConnected()) {
+        SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
+        delay(50);
+        Logger::log("Canvas Print: Forwarded %d bytes of TSPL to Bluetooth printer.", tsplPayload.length());
+        webServer.send(200, "application/json", "{\"status\":\"success\"}");
+    } else {
+        Logger::log("Canvas Print error: Bluetooth printer is offline!");
+        webServer.send(530, "application/json", "{\"error\":\"Printer offline\"}");
+    }
 }
 
 // Strict Captive Portal Redirection
@@ -676,10 +781,20 @@ void initWebServer() {
     webServer.on("/api/wifi/save", HTTP_POST, handleSaveApi);
     webServer.on("/api/bt/scan", HTTP_GET, handleBtScanApi);
     webServer.on("/api/bt/save", HTTP_POST, handleBtSaveApi);
+    webServer.on("/api/status", HTTP_OPTIONS, handleOptionsCORS);
+    webServer.on("/api/status", HTTP_GET, handleStatusApi);
+    webServer.on("/api/printer/status", HTTP_OPTIONS, handleOptionsCORS);
+    webServer.on("/api/printer/status", HTTP_GET, handleStatusApi);
+    webServer.on("/api/template/save", HTTP_OPTIONS, handleOptionsCORS);
     webServer.on("/api/template/save", HTTP_POST, handleTemplateSaveApi);
+    webServer.on("/api/template/load", HTTP_OPTIONS, handleOptionsCORS);
     webServer.on("/api/template/load", HTTP_GET, handleTemplateLoadApi);
+    webServer.on("/api/template/reset", HTTP_OPTIONS, handleOptionsCORS);
     webServer.on("/api/template/reset", HTTP_POST, handleTemplateResetApi);
+    webServer.on("/api/print", HTTP_OPTIONS, handleOptionsCORS);
     webServer.on("/api/print", HTTP_POST, handlePrintApi);
+    webServer.on("/api/print/canvas", HTTP_OPTIONS, handleOptionsCORS);
+    webServer.on("/api/print/canvas", HTTP_POST, handlePrintCanvasApi);
 
     // Captive Portal OS Detection Probe Handlers
     webServer.on("/generate_204", handleCaptivePortal);

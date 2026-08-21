@@ -82,31 +82,36 @@ void loop() {
     checkPrinterConnection();
 
     // 5. Handle TCP Print Server Connections (Port 9100)
-    if (!printClient) {
-        printClient = printServer.available();
-        if (printClient) {
+    if (!printClient || !printClient.connected()) {
+        WiFiClient newClient = printServer.available();
+        if (newClient) {
+            if (printClient) {
+                printClient.stop();
+            }
+            printClient = newClient;
             Logger::log("Incoming Wi-Fi TCP print client connected from %s", 
                         printClient.remoteIP().toString().c_str());
         }
     }
 
     if (printClient) {
-        if (printClient.connected()) {
-            if (printClient.available()) {
-                // Read chunks of data and forward to printer
-                uint8_t buffer[256];
-                int bytesRead = printClient.read(buffer, sizeof(buffer));
-                if (bytesRead > 0) {
-                    if (isPrinterConnected()) {
-                        SerialBT.write(buffer, bytesRead);
-                        delay(10);
-                        Logger::log("Forwarded %d bytes of print data to printer.", bytesRead);
-                    } else {
-                        Logger::log("WARNING: Received %d print bytes, but printer is offline!", bytesRead);
-                    }
+        while (printClient.available() > 0) {
+            // Drain chunks of data and forward to printer
+            uint8_t buffer[256];
+            int bytesRead = printClient.read(buffer, sizeof(buffer));
+            if (bytesRead > 0) {
+                if (isPrinterConnected()) {
+                    SerialBT.write(buffer, bytesRead);
+                    delay(5);
+                    Logger::log("Forwarded %d bytes of print data to printer.", bytesRead);
+                } else {
+                    Logger::log("WARNING: Received %d print bytes, but printer is offline!", bytesRead);
                 }
             }
-        } else {
+        }
+
+        // Only close after client has disconnected AND all buffered data is read
+        if (!printClient.connected() && printClient.available() == 0) {
             printClient.stop();
             Logger::log("Wi-Fi TCP print client disconnected.");
         }

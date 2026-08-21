@@ -15,10 +15,14 @@ static void loadSavedMAC() {
     String savedMac = btPreferences.getString("mac", "");
     btPreferences.end();
     if (savedMac.length() == 17) {
-        sscanf(savedMac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-               &macAddress[0], &macAddress[1], &macAddress[2],
-               &macAddress[3], &macAddress[4], &macAddress[5]);
-        Logger::log("Loaded saved printer MAC address from NVS: %s", savedMac.c_str());
+        unsigned int b[6];
+        if (sscanf(savedMac.c_str(), "%x:%x:%x:%x:%x:%x",
+                   &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) == 6) {
+            for (int i = 0; i < 6; i++) {
+                macAddress[i] = (uint8_t)b[i];
+            }
+            Logger::log("Loaded saved printer MAC address from NVS: %s", savedMac.c_str());
+        }
     }
 }
 
@@ -39,41 +43,33 @@ bool connectPrinter() {
         return false;
     }
 
+    // Don't attempt connection on boot if default placeholder MAC is set
+    if (macAddress[0] == 0x00 && macAddress[1] == 0x11 && macAddress[2] == 0x22) {
+        Logger::log("Default placeholder MAC configured. Awaiting printer pairing from web UI.");
+        printerConnected = false;
+        return false;
+    }
+
     String macStr = getPrinterMACString();
     Logger::log("Attempting Bluetooth connection to printer: %s", macStr.c_str());
+
+    SerialBT.disconnect();
+    delay(100);
 
     if (SerialBT.connect(macAddress)) {
         Logger::log("Bluetooth printer connected successfully!");
         printerConnected = true;
         return true;
     } else {
-        Logger::log("Bluetooth printer connection failed.");
+        Logger::log("Bluetooth printer connection failed. Will auto-retry periodically.");
         printerConnected = false;
         return false;
     }
 }
 
 bool isPrinterConnected() {
-    if (SerialBT.connected()) {
-        printerConnected = true;
-        return true;
-    }
-    
-    // Check if default placeholder MAC is still set
-    if (macAddress[0] == 0x00 && macAddress[1] == 0x11 && macAddress[2] == 0x22) {
-        printerConnected = false;
-        return false;
-    }
-
-    // Try to connect if offline
-    Logger::log("Printer disconnected. Attempting Bluetooth connection to %s...", getPrinterMACString().c_str());
-    if (SerialBT.connect(macAddress)) {
-        Logger::log("Bluetooth connection successful!");
-        printerConnected = true;
-        return true;
-    }
-    printerConnected = false;
-    return false;
+    printerConnected = SerialBT.connected();
+    return printerConnected;
 }
 
 void checkPrinterConnection() {
@@ -94,6 +90,8 @@ void checkPrinterConnection() {
     if (now - lastCheckTime >= CHECK_INTERVAL_MS) {
         lastCheckTime = now;
         Logger::log("Auto-reconnecting Bluetooth printer (%s)...", getPrinterMACString().c_str());
+        SerialBT.disconnect();
+        delay(100);
         if (SerialBT.connect(macAddress)) {
             Logger::log("Auto-reconnected to Bluetooth printer successfully!");
             printerConnected = true;
@@ -169,16 +167,15 @@ bool savePrinterMAC(const String& macStr) {
         return false;
     }
 
-    uint8_t newMac[6];
-    if (sscanf(macStr.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-               &newMac[0], &newMac[1], &newMac[2],
-               &newMac[3], &newMac[4], &newMac[5]) != 6) {
+    unsigned int b[6];
+    if (sscanf(macStr.c_str(), "%x:%x:%x:%x:%x:%x",
+               &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6) {
         Logger::log("Failed to parse MAC string: %s", macStr.c_str());
         return false;
     }
 
     for (int i = 0; i < 6; i++) {
-        macAddress[i] = newMac[i];
+        macAddress[i] = (uint8_t)b[i];
     }
 
     btPreferences.begin("printer-config", false);
@@ -186,10 +183,9 @@ bool savePrinterMAC(const String& macStr) {
     btPreferences.end();
     Logger::log("Saved new printer MAC address '%s' to NVS memory.", macStr.c_str());
 
-    if (SerialBT.connected()) {
-        SerialBT.disconnect();
-    }
+    SerialBT.disconnect();
     printerConnected = false;
+    delay(100);
 
     if (SerialBT.connect(macAddress)) {
         Logger::log("Connected to newly configured printer: %s", macStr.c_str());
