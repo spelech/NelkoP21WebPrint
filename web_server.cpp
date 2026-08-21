@@ -546,6 +546,17 @@ void handleBtSaveApi() {
     webServer.send(400, "application/json", "{\"error\":\"Invalid MAC address\"}");
 }
 
+static void sendCORSHeaders() {
+    webServer.sendHeader("Access-Control-Allow-Origin", "*");
+    webServer.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    webServer.sendHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+void handleOptionsCORS() {
+    sendCORSHeaders();
+    webServer.send(204, "text/plain", "");
+}
+
 void handleStatusApi() {
     sendCORSHeaders();
     String json = "{";
@@ -578,17 +589,6 @@ void clearStoredTemplateJSON() {
     prefs.begin("label-tpl", false);
     prefs.remove("layout");
     prefs.end();
-}
-
-static void sendCORSHeaders() {
-    webServer.sendHeader("Access-Control-Allow-Origin", "*");
-    webServer.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    webServer.sendHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
-void handleOptionsCORS() {
-    sendCORSHeaders();
-    webServer.send(204, "text/plain", "");
 }
 
 void handleTemplateSaveApi() {
