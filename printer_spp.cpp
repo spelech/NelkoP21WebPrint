@@ -185,14 +185,6 @@ bool savePrinterMAC(const String& macStr) {
 
     SerialBT.disconnect();
     printerConnected = false;
-    delay(100);
-
-    if (SerialBT.connect(macAddress)) {
-        Logger::log("Connected to newly configured printer: %s", macStr.c_str());
-        printerConnected = true;
-    } else {
-        Logger::log("Saved MAC, but connection attempt failed. Will auto-retry.", macStr.c_str());
-    }
-
+    lastCheckTime = 0; // Trigger auto-reconnect on next loop tick asynchronously
     return true;
 }
