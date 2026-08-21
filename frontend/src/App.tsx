@@ -98,13 +98,13 @@ export default function App(): React.ReactElement {
     elements, elementsRef, setElements, pushHistory, snapToGrid, canvasWidthPx, canvasHeightPx, containerRef, handleUndo, handleRedo,
   });
 
-  const [appVersion, setAppVersion] = useState<string>('3.1.2');
+  const [appVersion, setAppVersion] = useState<string>('3.1.1');
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [wizardTab, setWizardTab] = useState<string>('esp32');
   const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(1.5);
 
   const {
-    density, setDensity, copies, setCopies, invertColors, setInvertColors, isPrinting, printStatus, setPrintStatus,
+    isMobile, density, setDensity, copies, setCopies, invertColors, setInvertColors, isPrinting, printStatus, setPrintStatus,
     previewUrl, showPreview, setShowPreview, useBrowserBt, setUseBrowserBt, browserBtConnected, browserBtDeviceName,
     browserBtConnecting, handleConnectBrowserBt, handleDisconnectBrowserBt, handlePrint, handleGeneratePreview, handleExecuteBatchPrint,
   } = usePrinterBridge({ elements, activeWidthMm, activeHeightMm, selectedPreset, qrCache, selectedTemplateId, setShowWizardModal });
@@ -119,7 +119,7 @@ export default function App(): React.ReactElement {
   }, [printStatus, setPrintStatus]);
 
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [driverConfig, setDriverConfig] = useState<DriverConfig>({ driver_type: 'tcp', tcp_host: '127.0.0.1', tcp_port: 9100, bt_mac: '' });
+  const [driverConfig, setDriverConfig] = useState<DriverConfig>({ driver_type: 'tcp', tcp_host: '10.0.0.205', tcp_port: 9100, bt_mac: '' });
   const selectedElement = elements.find(el => el.id === selectedId) || null;
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function App(): React.ReactElement {
 
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden">
-      <Header appVersion={appVersion} historyIndex={historyIndex} history={history} handleUndo={handleUndo} handleRedo={handleRedo} useBrowserBt={useBrowserBt} setUseBrowserBt={setUseBrowserBt} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} browserBtConnecting={browserBtConnecting} handleConnectBrowserBt={handleConnectBrowserBt} handleDisconnectBrowserBt={handleDisconnectBrowserBt} setShowWizardModal={setShowWizardModal} handlePrint={handlePrint} isPrinting={isPrinting} />
+      <Header appVersion={appVersion} historyIndex={historyIndex} history={history} handleUndo={handleUndo} handleRedo={handleRedo} useBrowserBt={useBrowserBt} setUseBrowserBt={setUseBrowserBt} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} browserBtConnecting={browserBtConnecting} handleConnectBrowserBt={handleConnectBrowserBt} handleDisconnectBrowserBt={handleDisconnectBrowserBt} setShowWizardModal={setShowWizardModal} handlePrint={handlePrint} isPrinting={isPrinting} isMobile={isMobile} driverConfig={driverConfig} setShowSettings={setShowSettings} />
       <div className="flex-1 flex overflow-hidden">
         <aside className="hidden md:flex w-80 border-r border-slate-800 glass-panel p-5 flex-col gap-6 overflow-y-auto">
           <SidebarContent {...sidebarProps} />
@@ -187,8 +187,8 @@ export default function App(): React.ReactElement {
           ))}
         </nav>
       </div>
-      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} driverConfig={driverConfig} setDriverConfig={setDriverConfig} handleSaveConfig={handleSaveConfig} />
-      <WizardModal isOpen={showWizardModal} onClose={() => setShowWizardModal(false)} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} handleConnectBrowserBt={handleConnectBrowserBt} wizardTab={wizardTab} setWizardTab={setWizardTab} setUseBrowserBt={setUseBrowserBt} setShowSettings={setShowSettings} />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} driverConfig={driverConfig} setDriverConfig={setDriverConfig} handleSaveConfig={handleSaveConfig} isMobile={isMobile} />
+      <WizardModal isOpen={showWizardModal} onClose={() => setShowWizardModal(false)} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} handleConnectBrowserBt={handleConnectBrowserBt} wizardTab={wizardTab} setWizardTab={setWizardTab} setUseBrowserBt={setUseBrowserBt} setShowSettings={setShowSettings} isMobile={isMobile} />
       <BatchModal isOpen={showBatchModal} onClose={() => { setShowBatchModal(false); setCsvRows([]); setCsvHeaders([]); setCsvFilename(''); }} csvHeaders={csvHeaders} setCsvHeaders={setCsvHeaders} csvRows={csvRows} setCsvRows={setCsvRows} csvFilename={csvFilename} setCsvFilename={setCsvFilename} variableMapping={variableMapping} setVariableMapping={setVariableMapping} batchPreviewIndex={batchPreviewIndex} setBatchPreviewIndex={setBatchPreviewIndex} getTemplateVariables={() => getTemplateVariables(elements)} handleExecuteBatchPrint={handleExecuteBatchPrint} parseCSV={parseCSV} csvFileInputRef={csvFileInputRef} />
       <PreviewModal isOpen={showPreview} onClose={() => setShowPreview(false)} previewUrl={previewUrl} />
       {printStatus && (

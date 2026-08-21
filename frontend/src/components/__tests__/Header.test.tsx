@@ -70,9 +70,29 @@ describe('Header Component', () => {
     expect(handleRedo).toHaveBeenCalledTimes(1);
   });
 
-  it('toggles target switcher between Browser Direct and Server Bridge', () => {
+  it('renders Server Bridge status badge on desktop (isMobile=false)', () => {
+    const setShowSettings = vi.fn();
+    render(
+      <Header
+        {...defaultProps}
+        isMobile={false}
+        driverConfig={{ driver_type: 'tcp', tcp_host: '10.0.0.205', tcp_port: 9100, bt_mac: '' }}
+        setShowSettings={setShowSettings}
+      />
+    );
+
+    expect(screen.getByText('Server Bridge:')).toBeDefined();
+    expect(screen.getByText('10.0.0.205:9100')).toBeDefined();
+    expect(screen.queryByText('Browser Direct')).toBeNull();
+
+    const badgeBtn = screen.getByTitle('Click to configure Server Bridge settings');
+    fireEvent.click(badgeBtn);
+    expect(setShowSettings).toHaveBeenCalledWith(true);
+  });
+
+  it('toggles target switcher between Browser Direct and Server Bridge on mobile (isMobile=true)', () => {
     const setUseBrowserBt = vi.fn();
-    render(<Header {...defaultProps} useBrowserBt={true} setUseBrowserBt={setUseBrowserBt} />);
+    render(<Header {...defaultProps} isMobile={true} useBrowserBt={true} setUseBrowserBt={setUseBrowserBt} />);
 
     const serverBridgeBtn = screen.getByText('Server Bridge');
     fireEvent.click(serverBridgeBtn);
@@ -83,7 +103,7 @@ describe('Header Component', () => {
     expect(setUseBrowserBt).toHaveBeenCalledWith(true);
   });
 
-  it('renders bluetooth status and triggers pair/disconnect actions', () => {
+  it('renders bluetooth status and triggers pair/disconnect actions on mobile (isMobile=true)', () => {
     const handleConnectBrowserBt = vi.fn();
     const handleDisconnectBrowserBt = vi.fn();
 
@@ -91,6 +111,8 @@ describe('Header Component', () => {
     const { rerender } = render(
       <Header
         {...defaultProps}
+        isMobile={true}
+        useBrowserBt={true}
         browserBtConnected={false}
         browserBtConnecting={false}
         handleConnectBrowserBt={handleConnectBrowserBt}
@@ -106,6 +128,8 @@ describe('Header Component', () => {
     rerender(
       <Header
         {...defaultProps}
+        isMobile={true}
+        useBrowserBt={true}
         browserBtConnected={false}
         browserBtConnecting={true}
       />
@@ -116,6 +140,8 @@ describe('Header Component', () => {
     rerender(
       <Header
         {...defaultProps}
+        isMobile={true}
+        useBrowserBt={true}
         browserBtConnected={true}
         browserBtDeviceName="P21-BT-8899"
         handleDisconnectBrowserBt={handleDisconnectBrowserBt}
@@ -127,11 +153,12 @@ describe('Header Component', () => {
     expect(handleDisconnectBrowserBt).toHaveBeenCalledTimes(1);
   });
 
-  it('renders Configure Bridge button when in Server Bridge mode', () => {
+  it('renders Configure Bridge button on mobile when in Server Bridge mode', () => {
     const setShowWizardModal = vi.fn();
     render(
       <Header
         {...defaultProps}
+        isMobile={true}
         useBrowserBt={false}
         setShowWizardModal={setShowWizardModal}
       />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Printer, RefreshCw, Bluetooth, BluetoothSearching, Undo2, Redo2 } from 'lucide-react';
 import { LabelElement } from '../types';
+import { DriverConfig } from './Modals/SettingsModal';
 
 export interface HeaderProps {
   appVersion: string;
@@ -18,6 +19,9 @@ export interface HeaderProps {
   setShowWizardModal: (show: boolean) => void;
   handlePrint: () => void;
   isPrinting: boolean;
+  isMobile?: boolean;
+  driverConfig?: DriverConfig;
+  setShowSettings?: (show: boolean) => void;
 }
 
 export default function Header({
@@ -35,7 +39,10 @@ export default function Header({
   handleDisconnectBrowserBt,
   setShowWizardModal,
   handlePrint,
-  isPrinting
+  isPrinting,
+  isMobile = false,
+  driverConfig,
+  setShowSettings
 }: HeaderProps): React.ReactElement {
   return (
     <header className="h-14 md:h-16 border-b border-slate-800 glass-panel px-3 md:px-6 flex items-center justify-between z-10 shrink-0">
@@ -81,60 +88,74 @@ export default function Header({
           </button>
         </div>
 
-        {/* Connection status (hidden on mobile, managed in Print tab) */}
+        {/* Connection status */}
         <div className="hidden md:flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/55 p-1 rounded-xl border border-slate-800/80">
-            {/* Target Segmented Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-slate-950 border border-slate-850">
-              <button 
-                onClick={() => setUseBrowserBt(true)}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Browser Direct
-              </button>
-              <button 
-                onClick={() => setUseBrowserBt(false)}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Server Bridge
-              </button>
-            </div>
-
-            {/* Connection Status Buttons */}
-            {useBrowserBt ? (
-              browserBtConnected ? (
-                <button
-                  onClick={handleDisconnectBrowserBt}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 text-[10px] font-bold transition"
-                  title={`Connected to ${browserBtDeviceName}. Click to disconnect.`}
+          {!isMobile ? (
+            <button
+              onClick={() => (setShowSettings ? setShowSettings(true) : setShowWizardModal(true))}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-300 border border-slate-700/60 text-xs font-semibold shadow-sm transition"
+              title="Click to configure Server Bridge settings"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-slate-400 font-medium">Server Bridge:</span>
+              <span className="font-mono text-indigo-300">
+                {driverConfig?.tcp_host ? `${driverConfig.tcp_host}:${driverConfig.tcp_port || 9100}` : '10.0.0.205:9100'}
+              </span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-slate-900/55 p-1 rounded-xl border border-slate-800/80">
+              {/* Target Segmented Switcher */}
+              <div className="flex items-center p-0.5 rounded-lg bg-slate-950 border border-slate-850">
+                <button 
+                  onClick={() => setUseBrowserBt(true)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                 >
-                  <Bluetooth className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                  <span>{browserBtDeviceName || 'Connected'}</span>
+                  Browser Direct
                 </button>
+                <button 
+                  onClick={() => setUseBrowserBt(false)}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${!useBrowserBt ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Server Bridge
+                </button>
+              </div>
+
+              {/* Connection Status Buttons */}
+              {useBrowserBt ? (
+                browserBtConnected ? (
+                  <button
+                    onClick={handleDisconnectBrowserBt}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 text-[10px] font-bold transition"
+                    title={`Connected to ${browserBtDeviceName}. Click to disconnect.`}
+                  >
+                    <Bluetooth className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                    <span>{browserBtDeviceName || 'Connected'}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConnectBrowserBt}
+                    disabled={browserBtConnecting}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 text-[10px] font-bold transition disabled:opacity-50"
+                  >
+                    {browserBtConnecting ? (
+                      <BluetoothSearching className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                    ) : (
+                      <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
+                    )}
+                    <span>{browserBtConnecting ? 'Connecting...' : 'Pair'}</span>
+                  </button>
+                )
               ) : (
                 <button
-                  onClick={handleConnectBrowserBt}
-                  disabled={browserBtConnecting}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 text-[10px] font-bold transition disabled:opacity-50"
+                  onClick={() => setShowWizardModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-indigo-300 border border-indigo-500/10 text-[10px] font-bold transition"
                 >
-                  {browserBtConnecting ? (
-                    <BluetoothSearching className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                  ) : (
-                    <Bluetooth className="w-3.5 h-3.5 text-indigo-400" />
-                  )}
-                  <span>{browserBtConnecting ? 'Connecting...' : 'Pair'}</span>
+                  <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Configure Bridge</span>
                 </button>
-              )
-            ) : (
-              <button
-                onClick={() => setShowWizardModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-indigo-300 border border-indigo-500/10 text-[10px] font-bold transition"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Configure Bridge</span>
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Global Print Trigger Button */}

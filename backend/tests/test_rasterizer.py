@@ -17,5 +17,5 @@ def test_pack_bitmap_to_tspl_bytes():
     assert width_bytes == 14
     assert height_dots == 320
     assert len(raw_bytes) == 14 * 320
-    # All black means all bits 1 (0xFF)
-    assert raw_bytes[0] == 0xFF
+    # All black means all bits 0 (0x00, thermal pins fire)
+    assert raw_bytes[0] == 0x00
