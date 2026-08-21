@@ -16,6 +16,28 @@ env:
   IMAGE_NAME: spelech/nelkop21webprint
 
 jobs:
+  # Job 0: Validate PR Title on Pull Requests
+  pr-title-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            chore
+            refactor
+            docs
+            perf
+            test
+            build
+            ci
+
   # Job 1: Run Backend Unit & Integration Test Suite
   backend-tests:
     runs-on: ubuntu-latest
