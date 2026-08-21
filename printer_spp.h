@@ -13,5 +13,6 @@ void checkPrinterConnection();
 String scanBluetoothDevices();
 bool savePrinterMAC(const String& macStr);
 String getPrinterMACString();
+bool sendToPrinter(const uint8_t* data, size_t len);
 
 #endif

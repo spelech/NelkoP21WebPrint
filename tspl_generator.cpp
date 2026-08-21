@@ -144,14 +144,14 @@ static const uint16_t CODE128_PATTERNS[107] = {
 #define CODE128_START_B 104
 #define CODE128_STOP    106
 
-static void setPixelBlack(uint8_t* buf, int widthBytes, int x, int y) {
-    if (x < 0 || y < 0 || x >= (widthBytes * 8)) return;
+static void setPixelBlack(uint8_t* buf, int widthBytes, int heightDots, int x, int y) {
+    if (x < 0 || y < 0 || x >= (widthBytes * 8) || y >= heightDots) return;
     int byteIdx = (y * widthBytes) + (x / 8);
     int bitIdx = 7 - (x % 8);
     buf[byteIdx] &= ~(1 << bitIdx);
 }
 
-static void drawChar8x16(uint8_t* buf, int widthBytes, int startX, int startY, char c, int scale) {
+static void drawChar8x16(uint8_t* buf, int widthBytes, int heightDots, int startX, int startY, char c, int scale) {
     if ((uint8_t)c > 127) c = '?';
     const uint8_t* glyph = font8x16_basic[(uint8_t)c];
     for (int row = 0; row < 16; row++) {
@@ -160,7 +160,7 @@ static void drawChar8x16(uint8_t* buf, int widthBytes, int startX, int startY, c
             if (bits & (1 << (7 - col))) {
                 for (int sy = 0; sy < scale; sy++) {
                     for (int sx = 0; sx < scale; sx++) {
-                        setPixelBlack(buf, widthBytes, startX + (col * scale) + sx, startY + (row * scale) + sy);
+                        setPixelBlack(buf, widthBytes, heightDots, startX + (col * scale) + sx, startY + (row * scale) + sy);
                     }
                 }
             }
@@ -168,15 +168,15 @@ static void drawChar8x16(uint8_t* buf, int widthBytes, int startX, int startY, c
     }
 }
 
-static void drawString(uint8_t* buf, int widthBytes, int startX, int startY, const String& str, int scale) {
+static void drawString(uint8_t* buf, int widthBytes, int heightDots, int startX, int startY, const String& str, int scale) {
     int curX = startX;
     for (size_t i = 0; i < str.length(); i++) {
-        drawChar8x16(buf, widthBytes, curX, startY, str[i], scale);
+        drawChar8x16(buf, widthBytes, heightDots, curX, startY, str[i], scale);
         curX += (8 * scale) + (1 * scale);
     }
 }
 
-static void drawBarcode128(uint8_t* buf, int widthBytes, int startX, int startY, int height, int moduleWidth, const String& codeData) {
+static void drawBarcode128(uint8_t* buf, int widthBytes, int heightDots, int startX, int startY, int height, int moduleWidth, const String& codeData) {
     if (codeData.length() == 0) return;
 
     // Calculate checksum
@@ -204,7 +204,7 @@ static void drawBarcode128(uint8_t* buf, int widthBytes, int startX, int startY,
             if (isBar) {
                 for (int m = 0; m < moduleWidth; m++) {
                     for (int h = 0; h < height; h++) {
-                        setPixelBlack(buf, widthBytes, curX + m, startY + h);
+                        setPixelBlack(buf, widthBytes, heightDots, curX + m, startY + h);
                     }
                 }
             }
@@ -231,7 +231,7 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
         for (int y = 0; y < logicalH; y++) {
             for (int x = 0; x < logicalW; x++) {
                 if (x < b || x >= (logicalW - b) || y < b || y >= (logicalH - b)) {
-                    setPixelBlack(logicalBuf, logicalWidthBytes, x, y);
+                    setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, x, y);
                 }
             }
         }
@@ -245,7 +245,7 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
         int textWidth = req.mainText.length() * 9 * scale;
         int startX = (logicalW - textWidth) / 2 + req.xOffset;
         if (startX < 4) startX = 4;
-        drawString(logicalBuf, logicalWidthBytes, startX, yCursor, req.mainText, scale);
+        drawString(logicalBuf, logicalWidthBytes, logicalH, startX, yCursor, req.mainText, scale);
         yCursor += (16 * scale) + 4;
     }
 
@@ -255,7 +255,7 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
         int textWidth = req.subtitle.length() * 9 * scale;
         int startX = (logicalW - textWidth) / 2 + req.xOffset;
         if (startX < 4) startX = 4;
-        drawString(logicalBuf, logicalWidthBytes, startX, yCursor, req.subtitle, scale);
+        drawString(logicalBuf, logicalWidthBytes, logicalH, startX, yCursor, req.subtitle, scale);
         yCursor += (16 * scale) + 4;
     }
 
@@ -268,7 +268,7 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
         if (startX < 4) startX = 4;
         
         int bHeight = (req.barcodeHeight > 0) ? req.barcodeHeight : 24;
-        drawBarcode128(logicalBuf, logicalWidthBytes, startX, yCursor, bHeight, moduleWidth, req.barcodeData);
+        drawBarcode128(logicalBuf, logicalWidthBytes, logicalH, startX, yCursor, bHeight, moduleWidth, req.barcodeData);
         yCursor += bHeight + 2;
 
         // Draw Human Readable Numbers below barcode
@@ -276,7 +276,7 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
         int textWidth = req.barcodeData.length() * 9 * scale;
         int textStartX = (logicalW - textWidth) / 2 + req.xOffset;
         if (textStartX < 4) textStartX = 4;
-        drawString(logicalBuf, logicalWidthBytes, textStartX, yCursor, req.barcodeData, scale);
+        drawString(logicalBuf, logicalWidthBytes, logicalH, textStartX, yCursor, req.barcodeData, scale);
     }
 
     // ROTATION 90° CLOCKWISE:
@@ -318,7 +318,9 @@ String generateTSPLStream(const SimpleLabelRequest& req) {
     header += "CLS\r\n";
     header += "BITMAP 0,0," + String(physWidthBytes) + "," + String(physH) + ",0,";
 
-    String result = header;
+    String result = "";
+    result.reserve(header.length() + physTotalBytes + 32);
+    result += header;
     for (int i = 0; i < physTotalBytes; i++) {
         result += (char)physBuf[i];
     }
@@ -391,8 +393,8 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
             String type = elem["type"] | "";
             float rawX = elem["x"] | 0.0f;
             float rawY = elem["y"] | 0.0f;
-            int x = (int)(rawX / 100.0f * (float)logicalW);
-            int y = (int)(rawY / 100.0f * (float)logicalH);
+            int x = (rawX > 0.0f && rawX <= 1.0f) ? (int)(rawX * (float)logicalW) : (int)rawX;
+            int y = (rawY > 0.0f && rawY <= 1.0f) ? (int)(rawY * (float)logicalH) : (int)rawY;
 
             if (type == "text") {
                 String content = elem["content"].as<String>();
@@ -415,7 +417,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                 if (startX < 0) startX = 0;
                 if (startY < 0) startY = 0;
 
-                drawString(logicalBuf, logicalWidthBytes, startX, startY, content, scale);
+                drawString(logicalBuf, logicalWidthBytes, logicalH, startX, startY, content, scale);
             }
             else if (type == "barcode") {
                 String content = elem["content"].as<String>();
@@ -444,7 +446,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                 if (startX < 0) startX = 0;
                 if (startY < 0) startY = 0;
 
-                drawBarcode128(logicalBuf, logicalWidthBytes, startX, startY, bHeight, moduleWidth, content);
+                drawBarcode128(logicalBuf, logicalWidthBytes, logicalH, startX, startY, bHeight, moduleWidth, content);
             }
             else if (type == "line") {
                 int lw = elem["width"] | 1;
@@ -453,7 +455,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                 int startY = y - lh / 2;
                 for (int py = startY; py < startY + lh; py++) {
                     for (int px = startX; px < startX + lw; px++) {
-                        setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                        setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                     }
                 }
             }
@@ -467,7 +469,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                     for (int px = startX; px < startX + rw; px++) {
                         if (px < startX + thick || px >= startX + rw - thick ||
                             py < startY + thick || py >= startY + rh - thick) {
-                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                         }
                     }
                 }
@@ -489,7 +491,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                     for (int px = startX; px < startX + qrSize; px++) {
                         if (px < startX + 2 || px >= startX + qrSize - 2 ||
                             py < startY + 2 || py >= startY + qrSize - 2) {
-                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                         }
                     }
                 }
@@ -497,17 +499,17 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                 if (boxSize >= 4) {
                     for (int py = startY + 2; py < startY + 2 + boxSize; py++) {
                         for (int px = startX + 2; px < startX + 2 + boxSize; px++) {
-                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                         }
                     }
                     for (int py = startY + 2; py < startY + 2 + boxSize; py++) {
                         for (int px = startX + qrSize - 2 - boxSize; px < startX + qrSize - 2; px++) {
-                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                         }
                     }
                     for (int py = startY + qrSize - 2 - boxSize; py < startY + qrSize - 2; py++) {
                         for (int px = startX + 2; px < startX + 2 + boxSize; px++) {
-                            setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                            setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                         }
                     }
                 }
@@ -525,7 +527,7 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                         if (px < startX + 2 || px >= startX + imgW - 2 ||
                             py < startY + 2 || py >= startY + imgH - 2) {
                             if (px >= 0 && px < logicalW && py >= 0 && py < logicalH) {
-                                setPixelBlack(logicalBuf, logicalWidthBytes, px, py);
+                                setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px, py);
                             }
                         }
                     }
@@ -536,10 +538,10 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
                     int px2 = startX + imgW - 1 - d;
                     int py2 = startY + d;
                     if (px1 >= 0 && px1 < logicalW && py1 >= 0 && py1 < logicalH) {
-                        setPixelBlack(logicalBuf, logicalWidthBytes, px1, py1);
+                        setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px1, py1);
                     }
                     if (px2 >= 0 && px2 < logicalW && py2 >= 0 && py2 < logicalH) {
-                        setPixelBlack(logicalBuf, logicalWidthBytes, px2, py2);
+                        setPixelBlack(logicalBuf, logicalWidthBytes, logicalH, px2, py2);
                     }
                 }
             }
@@ -584,7 +586,9 @@ String generateTSPLFromJSON(const String& jsonStr, const SimpleLabelRequest& req
     header += "CLS\r\n";
     header += "BITMAP 0,0," + String(physWidthBytes) + "," + String(physH) + ",0,";
 
-    String result = header;
+    String result = "";
+    result.reserve(header.length() + physTotalBytes + 32);
+    result += header;
     for (int i = 0; i < physTotalBytes; i++) {
         result += (char)physBuf[i];
     }

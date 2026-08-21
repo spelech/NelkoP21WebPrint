@@ -692,10 +692,13 @@ void handlePrintApi() {
         }
 
         if (isPrinterConnected()) {
-            SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
-            delay(50);
-            Logger::log("Direct API Print: Sent %d bytes of TSPL to printer.", tsplPayload.length());
-            webServer.send(200, "application/json", "{\"status\":\"success\"}");
+            if (sendToPrinter((const uint8_t*)tsplPayload.c_str(), tsplPayload.length())) {
+                Logger::log("Direct API Print: Sent %d bytes of TSPL to printer.", tsplPayload.length());
+                webServer.send(200, "application/json", "{\"status\":\"success\"}");
+            } else {
+                Logger::log("Direct API Print: Write error / buffer stall.");
+                webServer.send(500, "application/json", "{\"error\":\"Print transmission failed\"}");
+            }
         } else {
             Logger::log("Direct API Print error: Printer is offline.");
             webServer.send(530, "application/json", "{\"error\":\"Printer offline\"}");
@@ -747,10 +750,13 @@ void handlePrintCanvasApi() {
     }
 
     if (isPrinterConnected()) {
-        SerialBT.write((const uint8_t*)tsplPayload.c_str(), tsplPayload.length());
-        delay(50);
-        Logger::log("Canvas Print: Forwarded %d bytes of TSPL to Bluetooth printer.", tsplPayload.length());
-        webServer.send(200, "application/json", "{\"status\":\"success\"}");
+        if (sendToPrinter((const uint8_t*)tsplPayload.c_str(), tsplPayload.length())) {
+            Logger::log("Canvas Print: Forwarded %d bytes of TSPL to Bluetooth printer.", tsplPayload.length());
+            webServer.send(200, "application/json", "{\"status\":\"success\"}");
+        } else {
+            Logger::log("Canvas Print: Write error / buffer stall.");
+            webServer.send(500, "application/json", "{\"error\":\"Print transmission failed\"}");
+        }
     } else {
         Logger::log("Canvas Print error: Bluetooth printer is offline!");
         webServer.send(530, "application/json", "{\"error\":\"Printer offline\"}");

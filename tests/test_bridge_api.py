@@ -146,17 +146,42 @@ class TestESP32BridgeAPI(unittest.TestCase):
             time.sleep(0.01)
         
         sock.close()
-        time.sleep(0.5)
+        time.sleep(1.2)
 
         status_code, body = http_get("/api/status")
         self.assertEqual(status_code, 200)
 
     def test_06_print_api_direct(self):
         """Test on-chip TSPL generation and print dispatch via POST /api/print."""
+        time.sleep(1.0)
         status_code, body = http_post("/api/print", json_data={
             "main_text": "ESP32 TEST",
             "subtitle": "INTEGRATION SUITE",
             "barcode_data": "987654"
+        })
+        self.assertEqual(status_code, 200)
+        resp = json.loads(body)
+        self.assertIn(resp.get("status"), ["ok", "success"])
+
+    def test_07_push_and_print_web_layout(self):
+        """Test pushing full web designer JSON layout and printing with variable substitution."""
+        time.sleep(1.0)
+        sample_web_layout = {
+            "preset": {"name": "40 x 14 mm", "width": 40, "height": 14, "gap": 5},
+            "elements": [
+                {"id": 101, "type": "text", "content": "{{mainText}}", "fontSize": 14, "fontStyle": "bold", "x": 160, "y": 25},
+                {"id": 102, "type": "barcode", "content": "{{barcodeData}}", "width": 120, "height": 24, "x": 160, "y": 70},
+                {"id": 103, "type": "rectangle", "width": 310, "height": 102, "thickness": 2, "x": 160, "y": 56}
+            ]
+        }
+        # Push web layout to ESP32 Flash
+        status_code, body = http_post("/api/template/save", json_data=sample_web_layout)
+        self.assertEqual(status_code, 200)
+
+        # Print using active template
+        status_code, body = http_post("/api/print", json_data={
+            "main_text": "INVENTORY #884",
+            "barcode_data": "884019"
         })
         self.assertEqual(status_code, 200)
         resp = json.loads(body)

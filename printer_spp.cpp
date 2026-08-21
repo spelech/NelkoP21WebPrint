@@ -188,3 +188,21 @@ bool savePrinterMAC(const String& macStr) {
     lastCheckTime = 0; // Trigger auto-reconnect on next loop tick asynchronously
     return true;
 }
+
+bool sendToPrinter(const uint8_t* data, size_t len) {
+    if (!printerConnected) return false;
+    const size_t CHUNK_SIZE = 256;
+    for (size_t i = 0; i < len; i += CHUNK_SIZE) {
+        size_t toWrite = (len - i < CHUNK_SIZE) ? (len - i) : CHUNK_SIZE;
+        size_t written = SerialBT.write(data + i, toWrite);
+        if (written == 0) {
+            delay(10);
+            yield();
+            written = SerialBT.write(data + i, toWrite);
+            if (written == 0) return false;
+        }
+        delay(2);
+        yield();
+    }
+    return true;
+}
