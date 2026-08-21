@@ -1,4 +1,4 @@
-import { useState, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import QRCode from 'qrcode';
 import { browserBtDriver } from '../utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from '../utils/tsplGenerator';
@@ -8,6 +8,14 @@ import {
 } from '../utils/canvasRenderer';
 import { LabelPreset, LabelElement, PrintStatus, BatchJob } from '../types';
 import { QrCacheItem } from '../components/CanvasWorkspace';
+
+export function isMobileClient(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || '';
+  const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const isCoarsePointer = typeof window.matchMedia === 'function' && Boolean(window.matchMedia('(pointer: coarse)')?.matches);
+  return isMobileUserAgent || isCoarsePointer;
+}
 
 export interface UsePrinterBridgeParams {
   elements: LabelElement[];
@@ -20,6 +28,7 @@ export interface UsePrinterBridgeParams {
 }
 
 export interface UsePrinterBridgeReturn {
+  isMobile: boolean;
   density: number;
   setDensity: Dispatch<SetStateAction<number>>;
   copies: number;
@@ -58,22 +67,75 @@ export function usePrinterBridge({
   selectedTemplateId,
   setShowWizardModal
 }: UsePrinterBridgeParams): UsePrinterBridgeReturn {
+  const isMobile = isMobileClient();
+
   // Print & Driver State
-  const [useBrowserBt, setUseBrowserBt] = useState<boolean>(true);
+  const [useBrowserBt, setUseBrowserBt] = useState<boolean>(() => {
+    if (!isMobile) return false;
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('nelko_use_browser_bt');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [browserBtConnected, setBrowserBtConnected] = useState<boolean>(false);
   const [browserBtDeviceName, setBrowserBtDeviceName] = useState<string>('');
   const [browserBtConnecting, setBrowserBtConnecting] = useState<boolean>(false);
 
-  const [density, setDensity] = useState<number>(3);
-  const [copies, setCopies] = useState<number>(1);
+  const [density, setDensity] = useState<number>(() => {
+    if (typeof window === 'undefined') return 3;
+    const saved = localStorage.getItem('nelko_print_density');
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 15) return parsed;
+    }
+    return 3;
+  });
+
+  const [copies, setCopies] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1;
+    const saved = localStorage.getItem('nelko_print_copies');
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 1) return parsed;
+    }
+    return 1;
+  });
+
   const [ditherMethod] = useState<string>('threshold');
-  const [invertColors, setInvertColors] = useState<boolean>(false);
+  const [invertColors, setInvertColors] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('nelko_invert_colors');
+    return saved === 'true';
+  });
 
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [printStatus, setPrintStatus] = useState<PrintStatus | null>(null);
 
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isMobile) {
+      localStorage.setItem('nelko_use_browser_bt', String(useBrowserBt));
+    }
+  }, [useBrowserBt, isMobile]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nelko_print_density', String(density));
+    }
+  }, [density]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nelko_print_copies', String(copies));
+    }
+  }, [copies]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nelko_invert_colors', String(invertColors));
+    }
+  }, [invertColors]);
 
   // Connect Browser Bluetooth
   const handleConnectBrowserBt = async (): Promise<void> => {
@@ -280,6 +342,7 @@ export function usePrinterBridge({
   };
 
   return {
+    isMobile,
     density,
     setDensity,
     copies,

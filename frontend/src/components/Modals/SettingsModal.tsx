@@ -14,6 +14,7 @@ export interface SettingsModalProps {
   driverConfig: DriverConfig;
   setDriverConfig: (config: DriverConfig) => void;
   handleSaveConfig: () => void;
+  isMobile?: boolean;
 }
 
 export default function SettingsModal({ 
@@ -21,7 +22,8 @@ export default function SettingsModal({
   onClose, 
   driverConfig, 
   setDriverConfig, 
-  handleSaveConfig 
+  handleSaveConfig,
+  isMobile: _isMobile = false
 }: SettingsModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 
@@ -34,6 +36,11 @@ export default function SettingsModal({
         </h3>
 
         <div className="flex flex-col gap-4">
+          <div className="bg-indigo-950/40 border border-indigo-500/20 rounded-xl p-3 text-xs text-indigo-200">
+            <span className="font-semibold text-indigo-300">TCP Network Bridge: </span>
+            Recommended for server & ESP32 network printing (default: <code className="text-white font-mono">10.0.0.205:9100</code>).
+          </div>
+
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Driver Type</label>
             <select 

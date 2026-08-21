@@ -60,7 +60,7 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
     
     # Create padded image if width is not byte-aligned
     if w != padded_w:
-        padded_img = Image.new("1", (padded_w, h), 255)  # 255 / non-zero = white in PIL
+        padded_img = Image.new("1", (padded_w, h), 1)  # 1 = white in PIL
         padded_img.paste(mono, (0, 0))
         mono = padded_img
         
@@ -73,9 +73,9 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
             byte_val = 0
             for bit in range(8):
                 x = x_byte * 8 + bit
-                # In PIL "1" mode: 0 = Black pixel, non-zero (255) = White pixel
-                # In TSPL BITMAP on Nelko P21: 0 bit = Black (thermal pin fires), 1 bit = White paper (pin off)
-                if pixels[x, y] != 0:  # Set bit for White paper, leave 0 for Black
+                # In PIL "1" mode: 0 = Black pixel, 1 = White pixel
+                # In TSPL BITMAP on Nelko P21: 0 bit = Black (thermal pin fires), 1 bit = White paper
+                if pixels[x, y] == 1:  # Set bit for White paper, leave 0 for Black
                     byte_val |= (1 << (7 - bit))  # Set bit (MSB-first)
             raw_bytes[idx] = byte_val
             idx += 1

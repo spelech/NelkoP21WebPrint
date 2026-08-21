@@ -17,10 +17,20 @@ class TestAPIRoutes(unittest.TestCase):
         self.assertIn("config", data)
         self.assertIn("driver_status", data)
 
+    def setUp(self):
+        from app.core.config import settings
+        self.orig_driver = settings.DEFAULT_DRIVER_TYPE
+        settings.DEFAULT_DRIVER_TYPE = "mock"
+
+    def tearDown(self):
+        from app.core.config import settings
+        settings.DEFAULT_DRIVER_TYPE = self.orig_driver
+
     def test_get_presets(self):
         response = client.get("/api/presets")
         self.assertEqual(response.status_code, 200)
-        presets = response.json()
+        data = response.json()
+        presets = data.get("presets", data) if isinstance(data, dict) else data
         self.assertTrue(len(presets) > 0)
         self.assertIn("width", presets[0])
         self.assertIn("height", presets[0])

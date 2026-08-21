@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.core.config import settings
+from app.core.config import settings, save_config_file
 from app.api.print_routes import get_driver
 
 router = APIRouter(prefix="/api/printer", tags=["Printer Configuration"])
@@ -34,4 +34,5 @@ def update_printer_config(cfg: PrinterConfigModel):
     settings.PRINTER_TCP_HOST = cfg.tcp_host
     settings.PRINTER_TCP_PORT = cfg.tcp_port
     settings.PRINTER_BT_MAC = cfg.bt_mac
+    save_config_file(cfg.model_dump() if hasattr(cfg, "model_dump") else cfg.dict())
     return {"status": "updated", "config": cfg}

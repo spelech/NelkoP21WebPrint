@@ -10,6 +10,7 @@ export interface WizardModalProps {
   setWizardTab: (tab: 'pc' | 'mobile' | 'bridge' | string) => void;
   setUseBrowserBt: (useBt: boolean) => void;
   setShowSettings: (show: boolean) => void;
+  isMobile?: boolean;
 }
 
 export default function WizardModal({
@@ -19,7 +20,8 @@ export default function WizardModal({
   wizardTab,
   setWizardTab,
   setUseBrowserBt,
-  setShowSettings
+  setShowSettings,
+  isMobile: _isMobile = false
 }: WizardModalProps): React.ReactElement | null {
   if (!isOpen) return null;
 

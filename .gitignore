@@ -16,3 +16,7 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+data/
+backend/data/
+app/data/
+
