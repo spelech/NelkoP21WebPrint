@@ -153,6 +153,12 @@ NelkoP21WebPrint/
 │   ├── 06_ESP32_MULTI_NODE_BRIDGE.md
 │   ├── 07_SYSTEM_ARCHITECTURE.md
 │   └── images/                 # Real Web UI Screenshots
+├── firmware/                   # ESP32 Wi-Fi & Bluetooth SPP Bridge Firmware
+│   ├── esp32-LabelPrinter.ino  # Main Arduino sketch & loop
+│   ├── tspl_generator.cpp / .h # On-chip 1-bit bitmap rasterizer & font engine
+│   ├── web_server.cpp / .h     # Embedded Web Designer & REST API
+│   ├── printer_spp.cpp / .h    # Bluetooth Classic SPP driver & chunked TX
+│   └── tests/                  # Integration test suite (test_bridge_api.py)
 ├── backend/                    # Python FastAPI & FastMCP Server
 │   ├── app/
 │   │   ├── api/                # REST endpoints
@@ -163,11 +169,11 @@ NelkoP21WebPrint/
 │   └── requirements.txt
 ├── frontend/                   # React Visual Label Studio
 │   ├── src/
-│   │   ├── App.jsx             # Label Editor UI
+│   │   ├── App.tsx             # Label Editor UI
 │   │   ├── utils/              # Client-side Web Bluetooth & TSPL generator
-│   │   └── main.jsx
-│   └── vite.config.js
-├── .github/workflows/          # GitHub Actions CI/CD & GHCR Release
+│   │   └── main.tsx
+│   └── vite.config.ts
+├── .github/workflows/          # GitHub Actions CI/CD (Docker GHCR + Firmware binaries)
 ├── .env.example                # Sample environment configuration
 ├── AGENTS.md                   # AI agent coding guidelines & rules
 ├── Dockerfile                  # Multi-stage Docker build
