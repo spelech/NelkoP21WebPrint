@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.api.print_routes import router as print_router
 from app.api.printer_routes import router as printer_router
 from app.api.template_routes import router as template_router
+from app.mcp.server import mcp
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -28,6 +29,10 @@ app.add_middleware(
 app.include_router(print_router)
 app.include_router(printer_router)
 app.include_router(template_router)
+
+# Mount FastMCP Endpoints
+app.mount("/sse", mcp.http_app(transport="sse"))
+app.mount("/mcp", mcp.http_app(transport="http"))
 
 # Static files for built frontend
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")

@@ -85,6 +85,12 @@ class SPPPrinterDriver(BasePrinterDriver):
             return {"connected": False, "status": "disconnected", "mac": self.mac_address}
         return {"connected": True, "status": "ready", "mac": self.mac_address}
 
+    def probe_connection(self) -> Dict[str, Any]:
+        return {
+            "bridge_reachable": False,
+            "status": "SPP direct Bluetooth bridge probing not supported over TCP"
+        }
+
 
 class MockPrinterDriver(BasePrinterDriver):
     """Mock Driver for testing without a physical printer."""
@@ -107,3 +113,9 @@ class MockPrinterDriver(BasePrinterDriver):
 
     def get_status(self) -> Dict[str, Any]:
         return {"connected": True, "status": "mock_ready", "received_bytes": len(self.received_bytes)}
+
+    def probe_connection(self) -> Dict[str, Any]:
+        return {
+            "bridge_reachable": True,
+            "status": "Mock printer driver active"
+        }

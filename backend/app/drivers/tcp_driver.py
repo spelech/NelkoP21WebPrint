@@ -67,3 +67,40 @@ class TCPPrinterDriver(BasePrinterDriver):
         if not self.connected:
             return {"connected": False, "status": "disconnected", "host": self.host, "port": self.port}
         return {"connected": True, "status": "ready", "host": self.host, "port": self.port}
+
+    def probe_connection(self) -> Dict[str, Any]:
+        """
+        Perform a non-destructive TCP reachability probe to the bridge socket.
+        """
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2.0)
+            res = sock.connect_ex((self.host, self.port))
+            if res == 0:
+                return {
+                    "bridge_reachable": True,
+                    "host": self.host,
+                    "port": self.port,
+                    "status": "Bridge online and reachable"
+                }
+            else:
+                return {
+                    "bridge_reachable": False,
+                    "host": self.host,
+                    "port": self.port,
+                    "error": f"Bridge unreachable (code {res})"
+                }
+        except Exception as e:
+            return {
+                "bridge_reachable": False,
+                "host": self.host,
+                "port": self.port,
+                "error": f"Bridge probe failed: {e}"
+            }
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass

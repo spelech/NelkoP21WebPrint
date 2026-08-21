@@ -23,3 +23,8 @@ class BasePrinterDriver(ABC):
     def get_status(self) -> Dict[str, Any]:
         """Query printer status."""
         pass
+
+    @abstractmethod
+    def probe_connection(self) -> Dict[str, Any]:
+        """Perform quick non-destructive reachability probe of the connection/bridge."""
+        pass

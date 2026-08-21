@@ -14,6 +14,8 @@ from app.core.rasterizer import mm_to_dots, get_padded_dimensions, pack_bitmap_t
 from app.core.tspl_builder import TSPLStreamBuilder
 from app.main import app
 from fastapi.testclient import TestClient
+from tests.test_tcp_driver_probe import TestTCPDriverProbe
+from tests.test_mcp_server import TestMCPServer
 
 client = TestClient(app)
 
