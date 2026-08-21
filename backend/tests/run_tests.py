@@ -45,9 +45,21 @@ class TestRasterizer(unittest.TestCase):
 class TestTSPLBuilder(unittest.TestCase):
     def test_tspl_builder(self):
         builder = TSPLStreamBuilder(width_mm=14.0, height_mm=40.0, gap_mm=5.0)
-        img = Image.new("L", (112, 320), 255)  # All white
+        img = Image.new("L", (112, 320), 255)  # All white portrait
         payload = builder.build_from_image(img)
         
+        self.assertIn(b"SIZE 14.0 mm, 40.0 mm\r\n", payload)
+        self.assertIn(b"GAP 5.0 mm, 0 mm\r\n", payload)
+        self.assertIn(b"CLS\r\n", payload)
+        self.assertIn(b"BITMAP 0,0,14,320,0,", payload)
+        self.assertIn(b"\r\nPRINT 1,1\r\n", payload)
+
+    def test_tspl_builder_landscape(self):
+        builder = TSPLStreamBuilder(width_mm=40.0, height_mm=14.0, gap_mm=5.0)
+        img = Image.new("L", (320, 112), 255)  # Landscape image (auto-rotates to 112x320)
+        payload = builder.build_from_image(img)
+        
+        # Physical width across 14mm head must be 14.0 mm in SIZE header
         self.assertIn(b"SIZE 14.0 mm, 40.0 mm\r\n", payload)
         self.assertIn(b"GAP 5.0 mm, 0 mm\r\n", payload)
         self.assertIn(b"CLS\r\n", payload)
@@ -93,6 +105,25 @@ class TestAPIRoutes(unittest.TestCase):
             "copies": 1
         }
         response = client.post("/api/print/text", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("bytes_sent", data)
+
+    def test_post_print_canvas(self):
+        # Base64 1x1 transparent PNG
+        tiny_png_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        payload = {
+            "image_base64": tiny_png_b64,
+            "width_mm": 40.0,
+            "height_mm": 14.0,
+            "gap_mm": 5.0,
+            "density": 3,
+            "copies": 1,
+            "dither_method": "threshold",
+            "elements": [{"id": "el1", "type": "text", "content": "hello"}]
+        }
+        response = client.post("/api/print/canvas", json=payload)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")

@@ -32,9 +32,15 @@ class TSPLStreamBuilder:
         """
         Takes a 1-bit monochrome PIL Image and generates a complete TSPL byte stream.
         """
-        raw_bytes, width_bytes, height_dots = pack_bitmap_to_tspl_bytes(mono_image)
+        is_landscape = mono_image.width > mono_image.height
+        raw_bytes, width_bytes, height_dots = pack_bitmap_to_tspl_bytes(mono_image, auto_rotate_landscape=True)
         
-        header = f"SIZE {self.width_mm:.1f} mm, {self.height_mm:.1f} mm\r\n"
+        # When landscape image is rotated 90 degrees clockwise to match 14mm printhead,
+        # the physical printhead width corresponds to the shorter dimension (height_mm)
+        print_width_mm = self.height_mm if is_landscape else self.width_mm
+        print_height_mm = self.width_mm if is_landscape else self.height_mm
+        
+        header = f"SIZE {print_width_mm:.1f} mm, {print_height_mm:.1f} mm\r\n"
         if self.gap_mm > 0:
             header += f"GAP {self.gap_mm:.1f} mm, 0 mm\r\n"
         else:

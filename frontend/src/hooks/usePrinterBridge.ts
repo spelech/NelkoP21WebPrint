@@ -261,7 +261,8 @@ export function usePrinterBridge({
             gap_mm: selectedPreset.gap,
             density: density,
             copies: copies,
-            dither_method: ditherMethod
+            dither_method: ditherMethod,
+            elements: elements
           })
         });
         const data = await res.json();

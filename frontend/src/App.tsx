@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Printer, Plus, Sliders, Monitor } from 'lucide-react';
+import { Printer, Plus, Sliders, Monitor, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { parseCSV, getTemplateVariables } from './utils/csvParser';
 import { useHistory } from './hooks/useHistory';
@@ -98,16 +98,25 @@ export default function App(): React.ReactElement {
     elements, elementsRef, setElements, pushHistory, snapToGrid, canvasWidthPx, canvasHeightPx, containerRef, handleUndo, handleRedo,
   });
 
-  const [appVersion, setAppVersion] = useState<string>('3.1.0');
+  const [appVersion, setAppVersion] = useState<string>('3.1.1');
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [wizardTab, setWizardTab] = useState<string>('esp32');
   const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(1.5);
 
   const {
-    density, setDensity, copies, setCopies, invertColors, setInvertColors, isPrinting, setPrintStatus,
+    density, setDensity, copies, setCopies, invertColors, setInvertColors, isPrinting, printStatus, setPrintStatus,
     previewUrl, showPreview, setShowPreview, useBrowserBt, setUseBrowserBt, browserBtConnected, browserBtDeviceName,
     browserBtConnecting, handleConnectBrowserBt, handleDisconnectBrowserBt, handlePrint, handleGeneratePreview, handleExecuteBatchPrint,
   } = usePrinterBridge({ elements, activeWidthMm, activeHeightMm, selectedPreset, qrCache, selectedTemplateId, setShowWizardModal });
+
+  useEffect(() => {
+    if (printStatus) {
+      const timer = setTimeout(() => {
+        setPrintStatus(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [printStatus, setPrintStatus]);
 
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [driverConfig, setDriverConfig] = useState<DriverConfig>({ driver_type: 'tcp', tcp_host: '127.0.0.1', tcp_port: 9100, bt_mac: '' });
@@ -182,6 +191,26 @@ export default function App(): React.ReactElement {
       <WizardModal isOpen={showWizardModal} onClose={() => setShowWizardModal(false)} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} handleConnectBrowserBt={handleConnectBrowserBt} wizardTab={wizardTab} setWizardTab={setWizardTab} setUseBrowserBt={setUseBrowserBt} setShowSettings={setShowSettings} />
       <BatchModal isOpen={showBatchModal} onClose={() => { setShowBatchModal(false); setCsvRows([]); setCsvHeaders([]); setCsvFilename(''); }} csvHeaders={csvHeaders} setCsvHeaders={setCsvHeaders} csvRows={csvRows} setCsvRows={setCsvRows} csvFilename={csvFilename} setCsvFilename={setCsvFilename} variableMapping={variableMapping} setVariableMapping={setVariableMapping} batchPreviewIndex={batchPreviewIndex} setBatchPreviewIndex={setBatchPreviewIndex} getTemplateVariables={() => getTemplateVariables(elements)} handleExecuteBatchPrint={handleExecuteBatchPrint} parseCSV={parseCSV} csvFileInputRef={csvFileInputRef} />
       <PreviewModal isOpen={showPreview} onClose={() => setShowPreview(false)} previewUrl={previewUrl} />
+      {printStatus && (
+        <div className={`fixed bottom-16 md:bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all duration-300 ${
+          printStatus.type === 'success' 
+            ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/30 shadow-emerald-950/50' 
+            : 'bg-rose-950/90 text-rose-200 border-rose-500/30 shadow-rose-950/50'
+        }`}>
+          {printStatus.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          )}
+          <span className="text-xs md:text-sm font-medium">{printStatus.msg}</span>
+          <button 
+            onClick={() => setPrintStatus(null)}
+            className="ml-2 text-slate-400 hover:text-white transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

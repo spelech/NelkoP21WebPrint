@@ -57,6 +57,7 @@ class PrintCanvasRequest(BaseModel):
     density: int = 3
     copies: int = 1
     dither_method: str = "threshold"
+    elements: Optional[List[Dict[str, Any]]] = None
 
 class DirectPrintTextRequest(BaseModel):
     text: str = Field(..., description="Main plain text content to render and print")
