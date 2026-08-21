@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -10,10 +11,23 @@ from app.api.printer_routes import router as printer_router
 from app.api.template_routes import router as template_router
 from app.mcp.server import mcp
 
+# Create FastMCP ASGI sub-applications
+sse_app = mcp.http_app(transport="sse")
+http_app = mcp.http_app(transport="http")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with sse_app.lifespan(app):
+        async with http_app.lifespan(app):
+            yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="Web App, REST API & MCP Server for Nelko P21 Thermal Printers",
-    version=settings.VERSION
+    version=settings.VERSION,
+    lifespan=lifespan,
 )
 
 # Enable CORS for local React dev server
@@ -30,9 +44,11 @@ app.include_router(print_router)
 app.include_router(printer_router)
 app.include_router(template_router)
 
-# Mount FastMCP Endpoints
-app.mount("/sse", mcp.http_app(transport="sse"))
-app.mount("/mcp", mcp.http_app(transport="http"))
+# Mount / register FastMCP routes directly so that /sse, /messages, and /mcp are matched before static catch-all
+for route in sse_app.routes:
+    app.router.routes.append(route)
+for route in http_app.routes:
+    app.router.routes.append(route)
 
 # Static files for built frontend
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
