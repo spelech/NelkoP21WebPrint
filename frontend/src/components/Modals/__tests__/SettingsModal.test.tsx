@@ -126,4 +126,24 @@ describe('SettingsModal Component', () => {
     fireEvent.click(saveBtn);
     expect(handleSaveConfig).toHaveBeenCalledTimes(1);
   });
+
+  it('triggers handleProbeBridge when Test Bridge Connection is clicked and displays reachable result', async () => {
+    const handleProbeBridge = vi.fn().mockResolvedValue({
+      reachable: true,
+      status: 'Bridge online and reachable'
+    });
+
+    render(
+      <SettingsModal
+        {...defaultProps}
+        handleProbeBridge={handleProbeBridge}
+      />
+    );
+
+    const testBtn = screen.getByRole('button', { name: /Test Bridge Connection/i });
+    fireEvent.click(testBtn);
+
+    expect(handleProbeBridge).toHaveBeenCalledWith(defaultConfig);
+    expect(await screen.findByText('Bridge online and reachable')).toBeDefined();
+  });
 });

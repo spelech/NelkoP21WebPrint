@@ -16,6 +16,14 @@ class TestAPIRoutes(unittest.TestCase):
         data = response.json()
         self.assertIn("config", data)
         self.assertIn("driver_status", data)
+        self.assertIn("probe", data)
+        self.assertTrue(data["probe"].get("bridge_reachable"))
+
+    def test_post_printer_probe(self):
+        response = client.post("/api/printer/probe", json={"driver_type": "mock"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get("bridge_reachable"))
 
     def setUp(self):
         from app.core.config import settings

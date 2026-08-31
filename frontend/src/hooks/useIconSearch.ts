@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { MDI_OFFLINE } from '../utils/mdiIcons';
+import { MDI_OFFLINE, MdiIcon } from '../utils/mdiIcons';
 
 export interface IconResult {
   name: string;
   source: 'offline' | 'online';
+  set?: 'lucide' | 'fa6-solid' | 'mdi' | string;
   category?: string;
   path?: string;
+  svg?: string;
+  viewBox?: string;
+  fullName?: string;
 }
 
 export function useIconSearch() {
   const [iconSearch, setIconSearch] = useState('');
+  const [selectedSet, setSelectedSet] = useState<'all' | 'lucide' | 'fa6-solid' | 'mdi'>('all');
   const [iconResults, setIconResults] = useState<IconResult[]>([]);
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const searchAbortControllerRef = useRef<AbortController | null>(null);
@@ -32,11 +37,24 @@ export function useIconSearch() {
       searchAbortControllerRef.current = controller;
 
       const matches: IconResult[] = [];
-      const catalog = MDI_OFFLINE as Record<string, Array<{ name: string; path: string }>>;
-      Object.entries(catalog).forEach(([_cat, icons]) => {
-        icons.forEach((ic: { name: string; path: string }) => {
+      const catalog = MDI_OFFLINE as Record<string, MdiIcon[]>;
+      Object.entries(catalog).forEach(([cat, icons]) => {
+        icons.forEach((ic) => {
+          const iconSet = ic.set || 'mdi';
+          if (selectedSet !== 'all' && iconSet !== selectedSet) {
+            return;
+          }
           if (ic.name.toLowerCase().includes(iconSearch.toLowerCase())) {
-            matches.push({ ...ic, source: 'offline' });
+            matches.push({
+              name: ic.name,
+              set: iconSet,
+              category: cat,
+              source: 'offline',
+              path: ic.path,
+              svg: ic.svg,
+              viewBox: ic.viewBox,
+              fullName: `${iconSet}:${ic.name}`
+            });
           }
         });
       });
@@ -44,18 +62,30 @@ export function useIconSearch() {
 
       if (navigator.onLine) {
         try {
+          const prefixes = selectedSet === 'all' ? 'lucide,fa6-solid,mdi' : selectedSet;
           const res = await fetch(
-            `https://api.iconify.design/search?query=${encodeURIComponent(iconSearch)}&prefix=mdi`,
+            `https://api.iconify.design/search?query=${encodeURIComponent(iconSearch)}&prefixes=${prefixes}&limit=24`,
             { signal: controller.signal }
           );
           const data = await res.json();
           if (data.icons && data.icons.length > 0) {
             const webMatches: IconResult[] = [];
-            for (let i = 0; i < Math.min(data.icons.length, 12); i++) {
-              const fullName: string = data.icons[i];
-              const cleanName = fullName.replace('mdi:', '');
-              if (!matches.some(m => m.name === cleanName)) {
-                webMatches.push({ name: cleanName, source: 'online' });
+            for (let i = 0; i < Math.min(data.icons.length, 24); i++) {
+              const full: string = data.icons[i];
+              let prefix = 'mdi';
+              let cleanName = full;
+              if (full.includes(':')) {
+                const parts = full.split(':');
+                prefix = parts[0];
+                cleanName = parts[1];
+              }
+              if (!matches.some(m => m.name === cleanName && (m.set === prefix || !m.set))) {
+                webMatches.push({
+                  name: cleanName,
+                  set: prefix,
+                  source: 'online',
+                  fullName: full
+                });
               }
             }
             if (!controller.signal.aborted) {
@@ -79,11 +109,13 @@ export function useIconSearch() {
     return () => {
       clearTimeout(delayDebounceFn);
     };
-  }, [iconSearch]);
+  }, [iconSearch, selectedSet]);
 
   return {
     iconSearch,
     setIconSearch,
+    selectedSet,
+    setSelectedSet,
     iconResults,
     isSearchingIcons,
   };

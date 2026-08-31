@@ -1,4 +1,4 @@
-import React, { RefObject, MouseEvent, TouchEvent } from 'react';
+import React, { RefObject, MouseEvent, TouchEvent, useEffect } from 'react';
 import { QrCode } from 'lucide-react';
 import { LabelElement } from '../types';
 
@@ -24,8 +24,8 @@ export interface CanvasWorkspaceProps {
   showGrid: boolean;
   containerRef: RefObject<HTMLDivElement>;
   setSelectedId: (id: number | null) => void;
-  handleTouchStart: (e: TouchEvent<HTMLDivElement>) => void;
-  handleTouchMove: (e: TouchEvent<HTMLDivElement>) => void;
+  handleTouchStart: (e: TouchEvent<HTMLElement>) => void;
+  handleTouchMove: (e: TouchEvent<HTMLElement>) => void;
   handleTouchEnd: () => void;
   draggingId: number | null;
   alignmentGuides: AlignmentGuide[];
@@ -37,6 +37,7 @@ export interface CanvasWorkspaceProps {
 
 export default function CanvasWorkspace({
   zoomScale,
+  setZoomScale,
   canvasWidthPx,
   canvasHeightPx,
   showGrid,
@@ -52,18 +53,31 @@ export default function CanvasWorkspace({
   handleStartDrag,
   qrCache
 }: CanvasWorkspaceProps): React.ReactElement {
+  // Auto-fit canvas on initial load or canvas dimension change on mobile viewports
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const availableWidth = window.innerWidth - 32;
+      if (canvasWidthPx > availableWidth) {
+        const fitScale = Math.min(1.0, Math.max(0.5, availableWidth / canvasWidthPx));
+        setZoomScale(Math.round(fitScale * 100) / 100);
+      }
+    }
+  }, [canvasWidthPx, setZoomScale]);
+
   return (
-    <main className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-center relative overflow-auto pb-20 md:pb-0">
+    <main 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="flex-1 bg-slate-900/50 p-2 md:p-8 flex flex-col items-center justify-start md:justify-center relative overflow-auto pb-32 md:pb-0 touch-manipulation select-none"
+    >
       {/* Thermal Label Workspace Simulation */}
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center max-w-full">
         {/* Scalable Label Paper Sheet Wrapper */}
-        <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="my-4">
+        <div style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }} className="my-4 transition-transform duration-75 ease-out">
           <div 
             ref={containerRef}
             onClick={() => setSelectedId(null)}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
             style={{ 
               width: `${canvasWidthPx}px`, 
               height: `${canvasHeightPx}px`,
@@ -271,6 +285,36 @@ export default function CanvasWorkspace({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Floating Zoom & Fit Controls Pill */}
+      <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-30 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-full px-2 py-1 shadow-xl text-xs">
+        <button
+          onClick={() => setZoomScale(z => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))}
+          className="min-w-[28px] min-h-[28px] flex items-center justify-center rounded-full hover:bg-slate-800 text-slate-300 active:scale-95 transition font-bold text-sm"
+          title="Zoom Out"
+          aria-label="Zoom Out"
+        >
+          -
+        </button>
+        <button
+          onClick={() => {
+            const fit = Math.min(1.0, Math.max(0.5, (window.innerWidth - 32) / canvasWidthPx));
+            setZoomScale(Math.round(fit * 100) / 100);
+          }}
+          className="min-h-[28px] px-2.5 py-1 rounded-full hover:bg-slate-800 text-indigo-300 font-mono text-[11px] font-semibold active:scale-95 transition flex items-center justify-center"
+          title="Fit to Screen Width"
+        >
+          {Math.round(zoomScale * 100)}%
+        </button>
+        <button
+          onClick={() => setZoomScale(z => Math.min(3.0, Math.round((z + 0.1) * 10) / 10))}
+          className="min-w-[28px] min-h-[28px] flex items-center justify-center rounded-full hover:bg-slate-800 text-slate-300 active:scale-95 transition font-bold text-sm"
+          title="Zoom In"
+          aria-label="Zoom In"
+        >
+          +
+        </button>
       </div>
     </main>
   );

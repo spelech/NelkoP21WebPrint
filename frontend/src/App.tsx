@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Printer, Plus, Sliders, Monitor, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { parseCSV, getTemplateVariables } from './utils/csvParser';
@@ -63,17 +63,9 @@ export default function App(): React.ReactElement {
   }, [elements, qrCache]);
 
   const [mobilePanelTab, setMobilePanelTab] = useState<string>('canvas');
-  const { iconSearch, setIconSearch, iconResults, isSearchingIcons } = useIconSearch();
-
-  const handleSelectWebIcon = async (iconName: string): Promise<void> => {
-    try {
-      const res = await fetch(`https://api.iconify.design/mdi/${iconName}.svg`);
-      const svgText = await res.text();
-      const pathMatch = svgText.match(/d="([^"]+)"/);
-      if (pathMatch && pathMatch[1]) addIconElement(iconName, pathMatch[1]);
-      else alert("Failed to extract vector path from icon.");
-    } catch { alert("Failed to load icon from server."); }
-  };
+  const { 
+    iconSearch, setIconSearch, selectedSet, setSelectedSet, iconResults, isSearchingIcons 
+  } = useIconSearch();
 
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | string | null>(null);
@@ -101,7 +93,9 @@ export default function App(): React.ReactElement {
   const [appVersion, setAppVersion] = useState<string>('3.1.1');
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [wizardTab, setWizardTab] = useState<string>('esp32');
-  const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(1.5);
+  const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+  const initialZoom = isMobileScreen ? 0.9 : 1.2;
+  const { zoomScale, setZoomScale, handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchZoom(initialZoom);
 
   const {
     isMobile, density, setDensity, copies, setCopies, invertColors, setInvertColors, isPrinting, printStatus, setPrintStatus,
@@ -119,14 +113,95 @@ export default function App(): React.ReactElement {
   }, [printStatus, setPrintStatus]);
 
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [driverConfig, setDriverConfig] = useState<DriverConfig>({ driver_type: 'tcp', tcp_host: '10.0.0.205', tcp_port: 9100, bt_mac: '' });
+  const [driverConfig, setDriverConfig] = useState<DriverConfig>({ 
+    driver_type: 'tcp', 
+    tcp_host: '10.0.0.196', 
+    tcp_port: 9100, 
+    bt_mac: '' 
+  });
+  const [bridgeStatus, setBridgeStatus] = useState<'online' | 'offline' | 'checking' | 'unknown'>('checking');
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+
   const selectedElement = elements.find(el => el.id === selectedId) || null;
 
-  useEffect(() => {
-    fetch('/api/printer/status').then(res => res.json()).then(d => {
+  const {
+    fileInputRef, layoutFileInputRef, addTextElement, addQRElement, addBarcodeElement, addLineElement,
+    addRectangleElement, addPlaceholderElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
+    handleClearCanvas, handlePushToEsp32, updateSelectedElement, updateQRHelper, sendToBack, bringToFront,
+  } = useElementActions({
+    elements, elementsRef, setElements, pushHistory, selectedPreset, setSelectedPreset, setSelectedTemplateId, selectedId, setSelectedId, setHistory, setHistoryIndex, setPrintStatus,
+  });
+
+  const handleSelectWebIcon = async (iconName: string, iconSet: string = 'mdi'): Promise<void> => {
+    try {
+      const prefix = iconSet || 'mdi';
+      const cleanName = iconName.replace(/^[^:]+:/, '');
+      const res = await fetch(`https://api.iconify.design/${prefix}/${cleanName}.svg`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const svgText = await res.text();
+      if (svgText && svgText.includes('<svg')) {
+        addIconElement(cleanName, svgText, prefix);
+      } else {
+        alert("Failed to extract SVG from icon.");
+      }
+    } catch { 
+      alert("Failed to load icon from server."); 
+    }
+  };
+
+  const handleProbeBridge = useCallback(async (candidate?: DriverConfig): Promise<{ reachable: boolean; error?: string; status?: string }> => {
+    try {
+      const res = await fetch('/api/printer/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(candidate || driverConfig)
+      });
+      const data = await res.json();
+      if (data.bridge_reachable) {
+        if (!candidate || candidate.tcp_host === driverConfig.tcp_host) {
+          setBridgeStatus('online');
+          setBridgeError(null);
+        }
+        return { reachable: true, status: data.status || 'Bridge reachable' };
+      } else {
+        if (!candidate || candidate.tcp_host === driverConfig.tcp_host) {
+          setBridgeStatus('offline');
+          setBridgeError(data.error || 'Unreachable');
+        }
+        return { reachable: false, error: data.error || 'Bridge unreachable' };
+      }
+    } catch (err: any) {
+      if (!candidate || candidate.tcp_host === driverConfig.tcp_host) {
+        setBridgeStatus('offline');
+        setBridgeError(err?.message || 'Network error');
+      }
+      return { reachable: false, error: err?.message || 'Network error' };
+    }
+  }, [driverConfig]);
+
+  const refreshPrinterStatus = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch('/api/printer/status');
+      const d = await res.json();
       if (d.version) setAppVersion(d.version);
       if (d.config) setDriverConfig(d.config);
-    }).catch(() => {});
+      if (d.probe) {
+        if (d.probe.bridge_reachable) {
+          setBridgeStatus('online');
+          setBridgeError(null);
+        } else {
+          setBridgeStatus('offline');
+          setBridgeError(d.probe.error || 'Unreachable');
+        }
+      }
+    } catch {
+      setBridgeStatus('offline');
+      setBridgeError('Backend unreachable');
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPrinterStatus();
     fetch('/api/templates').then(res => res.json()).then(d => { if (Array.isArray(d)) setTemplates(d); }).catch(() => {});
     const saved = localStorage.getItem('nelko_studio_autosave');
     if (saved) {
@@ -137,30 +212,52 @@ export default function App(): React.ReactElement {
         }
       } catch (e) { console.error("Auto-save load failed:", e); }
     }
-  }, []);
 
-  const {
-    fileInputRef, layoutFileInputRef, addTextElement, addQRElement, addBarcodeElement, addLineElement,
-    addRectangleElement, addPlaceholderElement, handleImageUpload, addIconElement, handleExportLayout, handleImportLayout,
-    handleClearCanvas, handlePushToEsp32, updateSelectedElement, updateQRHelper, sendToBack, bringToFront,
-  } = useElementActions({
-    elements, elementsRef, setElements, pushHistory, selectedPreset, setSelectedPreset, setSelectedTemplateId, selectedId, setSelectedId, setHistory, setHistoryIndex, setPrintStatus,
-  });
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshPrinterStatus();
+      }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [refreshPrinterStatus]);
 
   const handleSaveConfig = async (): Promise<void> => {
     try {
+      setBridgeStatus('checking');
       await fetch('/api/printer/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(driverConfig) });
       setShowSettings(false);
+      await refreshPrinterStatus();
     } catch (err) { console.error(err); }
   };
 
   const sidebarProps = {
-    density, setDensity, copies, setCopies, invertColors, setInvertColors, useBrowserBt, setUseBrowserBt, elements, setShowBatchModal, setShowWizardModal, collapsedPrintParams, setCollapsedPrintParams, handleGeneratePreview, selectedPreset, setSelectedPreset, isPortraitView, setIsPortraitView, templates, selectedTemplateId, setSelectedTemplateId, setElements, setHistory, setHistoryIndex, handleExportLayout, layoutFileInputRef, handleImportLayout, handleClearCanvas, handlePushToEsp32, snapToGrid, setSnapToGrid, showGrid, setShowGrid, collapsedPresets, setCollapsedPresets, theme, setTheme, zoomScale, setZoomScale, addTextElement, addQRElement, addBarcodeElement, addLineElement, addRectangleElement, addPlaceholderElement, fileInputRef, handleImageUpload, collapsedAddElements, setCollapsedAddElements, iconSearch, setIconSearch, iconResults, isSearchingIcons, addIconElement, handleSelectWebIcon, collapsedIcons, setCollapsedIcons, selectedElement, updateSelectedElement, updateQRHelper, deleteSelectedElement, nudgeSelectedElement, sendToBack, bringToFront, pushHistory, elementsRef
+    density, setDensity, copies, setCopies, invertColors, setInvertColors, useBrowserBt, setUseBrowserBt, elements, setShowBatchModal, setShowWizardModal, collapsedPrintParams, setCollapsedPrintParams, handleGeneratePreview, selectedPreset, setSelectedPreset, isPortraitView, setIsPortraitView, templates, selectedTemplateId, setSelectedTemplateId, setElements, setHistory, setHistoryIndex, handleExportLayout, layoutFileInputRef, handleImportLayout, handleClearCanvas, handlePushToEsp32, snapToGrid, setSnapToGrid, showGrid, setShowGrid, collapsedPresets, setCollapsedPresets, theme, setTheme, zoomScale, setZoomScale, addTextElement, addQRElement, addBarcodeElement, addLineElement, addRectangleElement, addPlaceholderElement, fileInputRef, handleImageUpload, collapsedAddElements, setCollapsedAddElements, iconSearch, setIconSearch, selectedSet, setSelectedSet, iconResults, isSearchingIcons, addIconElement, handleSelectWebIcon, collapsedIcons, setCollapsedIcons, selectedElement, updateSelectedElement, updateQRHelper, deleteSelectedElement, nudgeSelectedElement, sendToBack, bringToFront, pushHistory, elementsRef
   };
 
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden">
-      <Header appVersion={appVersion} historyIndex={historyIndex} history={history} handleUndo={handleUndo} handleRedo={handleRedo} useBrowserBt={useBrowserBt} setUseBrowserBt={setUseBrowserBt} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} browserBtConnecting={browserBtConnecting} handleConnectBrowserBt={handleConnectBrowserBt} handleDisconnectBrowserBt={handleDisconnectBrowserBt} setShowWizardModal={setShowWizardModal} handlePrint={handlePrint} isPrinting={isPrinting} isMobile={isMobile} driverConfig={driverConfig} setShowSettings={setShowSettings} />
+      <Header 
+        appVersion={appVersion} 
+        historyIndex={historyIndex} 
+        history={history} 
+        handleUndo={handleUndo} 
+        handleRedo={handleRedo} 
+        useBrowserBt={useBrowserBt} 
+        setUseBrowserBt={setUseBrowserBt} 
+        browserBtConnected={browserBtConnected} 
+        browserBtDeviceName={browserBtDeviceName} 
+        browserBtConnecting={browserBtConnecting} 
+        handleConnectBrowserBt={handleConnectBrowserBt} 
+        handleDisconnectBrowserBt={handleDisconnectBrowserBt} 
+        setShowWizardModal={setShowWizardModal} 
+        handlePrint={handlePrint} 
+        isPrinting={isPrinting} 
+        isMobile={isMobile} 
+        driverConfig={driverConfig} 
+        setShowSettings={setShowSettings}
+        bridgeStatus={bridgeStatus}
+        bridgeError={bridgeError}
+      />
       <div className="flex-1 flex overflow-hidden">
         <aside className="hidden md:flex w-80 border-r border-slate-800 glass-panel p-5 flex-col gap-6 overflow-y-auto">
           <SidebarContent {...sidebarProps} />
@@ -169,7 +266,7 @@ export default function App(): React.ReactElement {
       </div>
       <div className="md:hidden">
         {mobilePanelTab !== 'canvas' && (
-          <div className="fixed inset-x-0 bottom-14 z-40 bg-slate-900 border-t border-slate-800 shadow-2xl max-h-[60vh] overflow-y-auto p-4 flex flex-col gap-4">
+          <div className="fixed inset-x-0 bottom-14 z-40 bg-slate-900 border-t border-slate-800 shadow-2xl h-[45vh] max-h-[380px] overflow-y-auto p-4 flex flex-col gap-4 transition-all duration-200 ease-out">
             <SidebarContent mobileTab={mobilePanelTab} {...sidebarProps} />
           </div>
         )}
@@ -187,7 +284,15 @@ export default function App(): React.ReactElement {
           ))}
         </nav>
       </div>
-      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} driverConfig={driverConfig} setDriverConfig={setDriverConfig} handleSaveConfig={handleSaveConfig} isMobile={isMobile} />
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        driverConfig={driverConfig} 
+        setDriverConfig={setDriverConfig} 
+        handleSaveConfig={handleSaveConfig} 
+        handleProbeBridge={handleProbeBridge}
+        isMobile={isMobile} 
+      />
       <WizardModal isOpen={showWizardModal} onClose={() => setShowWizardModal(false)} browserBtConnected={browserBtConnected} browserBtDeviceName={browserBtDeviceName} handleConnectBrowserBt={handleConnectBrowserBt} wizardTab={wizardTab} setWizardTab={setWizardTab} setUseBrowserBt={setUseBrowserBt} setShowSettings={setShowSettings} isMobile={isMobile} />
       <BatchModal isOpen={showBatchModal} onClose={() => { setShowBatchModal(false); setCsvRows([]); setCsvHeaders([]); setCsvFilename(''); }} csvHeaders={csvHeaders} setCsvHeaders={setCsvHeaders} csvRows={csvRows} setCsvRows={setCsvRows} csvFilename={csvFilename} setCsvFilename={setCsvFilename} variableMapping={variableMapping} setVariableMapping={setVariableMapping} batchPreviewIndex={batchPreviewIndex} setBatchPreviewIndex={setBatchPreviewIndex} getTemplateVariables={() => getTemplateVariables(elements)} handleExecuteBatchPrint={handleExecuteBatchPrint} parseCSV={parseCSV} csvFileInputRef={csvFileInputRef} />
       <PreviewModal isOpen={showPreview} onClose={() => setShowPreview(false)} previewUrl={previewUrl} />

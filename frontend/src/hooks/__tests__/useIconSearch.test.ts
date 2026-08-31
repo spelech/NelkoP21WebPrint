@@ -38,7 +38,7 @@ describe('useIconSearch', () => {
 
   it('fetches online icons from Iconify API when navigator.onLine is true', async () => {
     const mockIconifyResponse = {
-      icons: ['mdi:home-variant', 'mdi:home-heart'],
+      icons: ['mdi:home-variant', 'lucide:home-heart'],
     };
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -56,7 +56,7 @@ describe('useIconSearch', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('api.iconify.design/search?query=home&prefix=mdi'),
+      expect.stringContaining('api.iconify.design/search?query=home&prefixes=lucide,fa6-solid,mdi'),
       expect.any(Object)
     );
 
@@ -123,5 +123,31 @@ describe('useIconSearch', () => {
 
     expect(result.current.iconResults).toEqual([]);
     expect(result.current.isSearchingIcons).toBe(false);
+  });
+
+  it('filters offline catalog and online queries when selectedSet is changed', async () => {
+    const mockIconifyResponse = {
+      icons: ['lucide:home'],
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: () => Promise.resolve(mockIconifyResponse),
+    } as Response);
+
+    const { result } = renderHook(() => useIconSearch());
+
+    act(() => {
+      result.current.setSelectedSet('lucide');
+      result.current.setIconSearch('home');
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('prefixes=lucide'),
+      expect.any(Object)
+    );
   });
 });

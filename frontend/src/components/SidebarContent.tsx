@@ -71,10 +71,12 @@ export interface SidebarContentProps {
   // Icon Library
   iconSearch: string;
   setIconSearch: (search: string) => void;
+  selectedSet?: 'all' | 'lucide' | 'fa6-solid' | 'mdi';
+  setSelectedSet?: (set: 'all' | 'lucide' | 'fa6-solid' | 'mdi') => void;
   iconResults: IconResult[];
   isSearchingIcons: boolean;
-  addIconElement: (iconName: string, svgPath: string) => void;
-  handleSelectWebIcon: (iconName: string) => Promise<void>;
+  addIconElement: (iconName: string, svgPath: string, iconSet?: string, viewBox?: string) => void;
+  handleSelectWebIcon: (iconName: string, iconSet?: string) => Promise<void>;
   collapsedIcons: boolean;
   setCollapsedIcons: (collapsed: boolean) => void;
 
@@ -258,6 +260,8 @@ export default function SidebarContent(props: SidebarContentProps): React.ReactE
       <IconLibrary
         iconSearch={props.iconSearch}
         setIconSearch={props.setIconSearch}
+        selectedSet={props.selectedSet}
+        setSelectedSet={props.setSelectedSet}
         iconResults={props.iconResults}
         isSearchingIcons={props.isSearchingIcons}
         addIconElement={props.addIconElement}

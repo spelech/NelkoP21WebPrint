@@ -29,7 +29,7 @@ export interface UseElementActionsReturn {
   addRectangleElement: () => void;
   addPlaceholderElement: (placeholderVar: string) => void;
   handleImageUpload: (e: ChangeEvent<HTMLInputElement>) => void;
-  addIconElement: (name: string, path: string) => void;
+  addIconElement: (name: string, pathOrSvg: string, iconSet?: string, viewBox?: string) => void;
   handleExportLayout: () => void;
   handleImportLayout: (e: ChangeEvent<HTMLInputElement>) => void;
   handleClearCanvas: () => void;
@@ -125,8 +125,36 @@ export function useElementActions({
     e.target.value = '';
   };
 
-  const addIconElement = (name: string, path: string): void => {
-    const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"><path fill="#000000" d="${path}"/></svg>`;
+  const addIconElement = (
+    name: string,
+    pathOrSvg: string,
+    iconSet: string = 'mdi',
+    viewBox: string = '0 0 24 24'
+  ): void => {
+    let svgMarkup = '';
+    const trimmed = pathOrSvg.trim();
+    if (trimmed.startsWith('<svg')) {
+      svgMarkup = trimmed
+        .replace(/currentColor/g, '#000000')
+        .replace(/stroke="none"/g, 'stroke="none"')
+        .replace(/fill="none"/g, 'fill="none" stroke="#000000"');
+      if (!svgMarkup.includes('xmlns=')) {
+        svgMarkup = svgMarkup.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+    } else if (trimmed.includes('<')) {
+      if (iconSet === 'lucide') {
+        svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="60" height="60" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${trimmed}</svg>`;
+      } else {
+        svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="60" height="60" fill="#000000">${trimmed}</svg>`;
+      }
+    } else {
+      if (iconSet === 'lucide') {
+        svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="60" height="60" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${trimmed}"/></svg>`;
+      } else {
+        svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="60" height="60"><path fill="#000000" d="${trimmed}"/></svg>`;
+      }
+    }
+
     const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
     const newEl: ImageElement = { id: Date.now(), type: 'image', url: dataUrl, x: 50, y: 50, width: 60, height: 60, iconName: name };
     const img = new Image();

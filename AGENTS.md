@@ -33,7 +33,7 @@ Welcome, Agent. To maintain the codebase integrity and prevent regressions or ru
   ```dockerfile
   RUN npm install --legacy-peer-deps
   ```
-- **Local Builder Speedup**: Because the GitHub Action CI/CD builds multi-architecture images (`amd64` and `arm64`) under CPU-emulated QEMU (taking 30-45 minutes), you should build the image locally on the host server to verify or roll out changes immediately:
+- **Fast amd64 Pipeline**: GitHub Actions CI builds `linux/amd64` directly (no slow QEMU emulation). You can also build locally on the host server to test or roll out changes immediately:
   ```bash
   docker build -t ghcr.io/spelech/nelkop21webprint:latest -f Dockerfile .
   ```

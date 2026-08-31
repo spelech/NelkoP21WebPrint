@@ -22,6 +22,8 @@ export interface HeaderProps {
   isMobile?: boolean;
   driverConfig?: DriverConfig;
   setShowSettings?: (show: boolean) => void;
+  bridgeStatus?: 'online' | 'offline' | 'checking' | 'unknown';
+  bridgeError?: string | null;
 }
 
 export default function Header({
@@ -42,7 +44,9 @@ export default function Header({
   isPrinting,
   isMobile = false,
   driverConfig,
-  setShowSettings
+  setShowSettings,
+  bridgeStatus = 'unknown',
+  bridgeError = null
 }: HeaderProps): React.ReactElement {
   return (
     <header className="h-14 md:h-16 border-b border-slate-800 glass-panel px-3 md:px-6 flex items-center justify-between z-10 shrink-0">
@@ -67,23 +71,25 @@ export default function Header({
       {/* Action Controls */}
       <div className="flex items-center gap-1.5 md:gap-2.5 shrink-0">
         {/* Undo / Redo controls */}
-        <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+        <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 p-0.5 rounded-xl">
           <button
             onClick={handleUndo}
             disabled={historyIndex === 0}
-            className="p-1 px-1.5 md:px-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold flex items-center justify-center"
+            className="p-1.5 px-2 md:px-2.5 min-h-[28px] min-w-[28px] rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold flex items-center justify-center"
             title="Undo (Ctrl+Z)"
+            aria-label="Undo"
           >
-            <Undo2 className="w-3.5 h-3.5 md:hidden" />
+            <Undo2 className="w-4 h-4 md:hidden" />
             <span className="hidden md:inline">Undo</span>
           </button>
           <button
             onClick={handleRedo}
             disabled={historyIndex === history.length - 1}
-            className="p-1 px-1.5 md:px-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold flex items-center justify-center"
+            className="p-1.5 px-2 md:px-2.5 min-h-[28px] min-w-[28px] rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs font-semibold flex items-center justify-center"
             title="Redo (Ctrl+Y)"
+            aria-label="Redo"
           >
-            <Redo2 className="w-3.5 h-3.5 md:hidden" />
+            <Redo2 className="w-4 h-4 md:hidden" />
             <span className="hidden md:inline">Redo</span>
           </button>
         </div>
@@ -94,13 +100,46 @@ export default function Header({
             <button
               onClick={() => (setShowSettings ? setShowSettings(true) : setShowWizardModal(true))}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-300 border border-slate-700/60 text-xs font-semibold shadow-sm transition"
-              title="Click to configure Server Bridge settings"
+              title={
+                bridgeStatus === 'online'
+                  ? `Server Bridge: ${driverConfig?.tcp_host || '10.0.0.196'}:${driverConfig?.tcp_port || 9100} (Online & Reachable)`
+                  : bridgeStatus === 'offline'
+                  ? `Server Bridge: ${driverConfig?.tcp_host || '10.0.0.196'}:${driverConfig?.tcp_port || 9100} (Offline / Unreachable${bridgeError ? ` - ${bridgeError}` : ''}). Click to configure.`
+                  : bridgeStatus === 'checking'
+                  ? `Server Bridge: Checking reachability...`
+                  : `Click to configure Server Bridge settings`
+              }
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  bridgeStatus === 'online'
+                    ? 'bg-emerald-400 animate-pulse'
+                    : bridgeStatus === 'offline'
+                    ? 'bg-rose-500'
+                    : bridgeStatus === 'checking'
+                    ? 'bg-amber-400 animate-pulse'
+                    : 'bg-slate-500'
+                }`}
+              />
               <span className="text-slate-400 font-medium">Server Bridge:</span>
               <span className="font-mono text-indigo-300">
-                {driverConfig?.tcp_host ? `${driverConfig.tcp_host}:${driverConfig.tcp_port || 9100}` : '10.0.0.205:9100'}
+                {driverConfig?.tcp_host ? `${driverConfig.tcp_host}:${driverConfig.tcp_port || 9100}` : '10.0.0.196:9100'}
               </span>
+              {bridgeStatus === 'offline' && (
+                <span className="text-[10px] text-rose-400 font-semibold px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">
+                  Offline
+                </span>
+              )}
+              {bridgeStatus === 'online' && (
+                <span className="text-[10px] text-emerald-400 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                  Online
+                </span>
+              )}
+              {bridgeStatus === 'checking' && (
+                <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                  Checking...
+                </span>
+              )}
             </button>
           ) : (
             <div className="flex items-center gap-2 bg-slate-900/55 p-1 rounded-xl border border-slate-800/80">

@@ -72,10 +72,11 @@ describe('Header Component', () => {
 
   it('renders Server Bridge status badge on desktop (isMobile=false)', () => {
     const setShowSettings = vi.fn();
-    render(
+    const { rerender } = render(
       <Header
         {...defaultProps}
         isMobile={false}
+        bridgeStatus="online"
         driverConfig={{ driver_type: 'tcp', tcp_host: '10.0.0.205', tcp_port: 9100, bt_mac: '' }}
         setShowSettings={setShowSettings}
       />
@@ -83,11 +84,40 @@ describe('Header Component', () => {
 
     expect(screen.getByText('Server Bridge:')).toBeDefined();
     expect(screen.getByText('10.0.0.205:9100')).toBeDefined();
+    expect(screen.getByText('Online')).toBeDefined();
     expect(screen.queryByText('Browser Direct')).toBeNull();
 
-    const badgeBtn = screen.getByTitle('Click to configure Server Bridge settings');
+    const badgeBtn = screen.getByTitle(/Server Bridge: 10.0.0.205:9100 \(Online & Reachable\)/i);
     fireEvent.click(badgeBtn);
     expect(setShowSettings).toHaveBeenCalledWith(true);
+
+    // Offline state
+    rerender(
+      <Header
+        {...defaultProps}
+        isMobile={false}
+        bridgeStatus="offline"
+        bridgeError="Connection refused"
+        driverConfig={{ driver_type: 'tcp', tcp_host: '10.0.0.196', tcp_port: 9100, bt_mac: '' }}
+        setShowSettings={setShowSettings}
+      />
+    );
+
+    expect(screen.getByText('Offline')).toBeDefined();
+    expect(screen.getByTitle(/Offline \/ Unreachable - Connection refused/i)).toBeDefined();
+
+    // Checking state
+    rerender(
+      <Header
+        {...defaultProps}
+        isMobile={false}
+        bridgeStatus="checking"
+        driverConfig={{ driver_type: 'tcp', tcp_host: '10.0.0.196', tcp_port: 9100, bt_mac: '' }}
+        setShowSettings={setShowSettings}
+      />
+    );
+
+    expect(screen.getByText('Checking...')).toBeDefined();
   });
 
   it('toggles target switcher between Browser Direct and Server Bridge on mobile (isMobile=true)', () => {
