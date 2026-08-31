@@ -137,8 +137,18 @@ export default function CanvasWorkspace({
                     left: `${el.x}%`,
                     top: `${el.y}%`,
                     transform: 'translate(-50%, -50%)',
+                    width: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.width || 60}px` : el.type === 'barcode' ? `${el.width || 100}px` : el.type === 'line' ? `${el.width || 120}px` : el.type === 'rectangle' ? `${el.width || 160}px` : 'max-content',
+                    height: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.height || 60}px` : el.type === 'barcode' ? `${el.height || 30}px` : el.type === 'line' ? `${el.height || 4}px` : el.type === 'rectangle' ? `${el.height || 60}px` : 'auto',
+                    minWidth: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.width || 60}px` : el.type === 'barcode' ? `${el.width || 100}px` : el.type === 'line' ? `${el.width || 120}px` : el.type === 'rectangle' ? `${el.width || 160}px` : 'max-content',
+                    minHeight: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.height || 60}px` : el.type === 'barcode' ? `${el.height || 30}px` : el.type === 'line' ? `${el.height || 4}px` : el.type === 'rectangle' ? `${el.height || 60}px` : 'auto',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                    flexShrink: 0,
                     cursor: 'move',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   {el.type === 'text' && (
@@ -149,7 +159,9 @@ export default function CanvasWorkspace({
                         fontWeight: el.fontStyle === 'bold' ? 'bold' : 'normal',
                         textAlign: el.align || 'center',
                         display: 'block',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        maxWidth: 'none',
+                        flexShrink: 0
                       }}
                       className="text-slate-900 leading-none select-none tracking-tight font-outfit"
                     >
@@ -162,12 +174,28 @@ export default function CanvasWorkspace({
                       <img 
                         src={qrCache[el.content].url} 
                         alt="QR Code" 
-                        style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }}
+                        style={{ 
+                          width: `${el.size || 60}px`, 
+                          height: `${el.size || 60}px`,
+                          minWidth: `${el.size || 60}px`,
+                          minHeight: `${el.size || 60}px`,
+                          maxWidth: 'none',
+                          maxHeight: 'none',
+                          flexShrink: 0
+                        }}
                         className="shadow-sm"
                       />
                     ) : (
                       <div 
-                        style={{ width: `${el.size || 60}px`, height: `${el.size || 60}px` }} 
+                        style={{ 
+                          width: `${el.size || 60}px`, 
+                          height: `${el.size || 60}px`,
+                          minWidth: `${el.size || 60}px`,
+                          minHeight: `${el.size || 60}px`,
+                          maxWidth: 'none',
+                          maxHeight: 'none',
+                          flexShrink: 0
+                        }} 
                         className="bg-slate-900 text-white flex flex-col items-center justify-center rounded text-[9px] font-mono p-1 text-center shadow-inner overflow-hidden"
                       >
                         <QrCode className="w-1/2 h-1/2 mb-0.5 text-indigo-300 min-w-[16px] min-h-[16px]" />
@@ -180,14 +208,31 @@ export default function CanvasWorkspace({
                     <img 
                       src={el.url} 
                       alt="Uploaded Graphic" 
-                      style={{ width: `${el.width || 60}px`, height: `${el.height || 60}px`, objectFit: 'contain' }}
+                      style={{ 
+                        width: `${el.width || 60}px`, 
+                        height: `${el.height || 60}px`,
+                        minWidth: `${el.width || 60}px`,
+                        minHeight: `${el.height || 60}px`,
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        flexShrink: 0,
+                        objectFit: 'contain' 
+                      }}
                       className="rounded shadow-sm"
                     />
                   )}
 
                   {el.type === 'barcode' && (
                     <div 
-                      style={{ width: `${el.width || 100}px`, height: `${el.height || 30}px` }} 
+                      style={{ 
+                        width: `${el.width || 100}px`, 
+                        height: `${el.height || 30}px`,
+                        minWidth: `${el.width || 100}px`, 
+                        minHeight: `${el.height || 30}px`,
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        flexShrink: 0
+                      }} 
                       className="bg-white border border-slate-200 flex flex-col items-center justify-between rounded p-1 shadow-inner relative overflow-hidden"
                     >
                       <div className="w-full flex-1 flex items-stretch justify-around px-2 opacity-80 pointer-events-none">
@@ -205,7 +250,12 @@ export default function CanvasWorkspace({
                     <div 
                       style={{ 
                         width: `${el.width || 120}px`, 
-                        height: `${el.height || 4}px` 
+                        height: `${el.height || 4}px`,
+                        minWidth: `${el.width || 120}px`, 
+                        minHeight: `${el.height || 4}px`,
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        flexShrink: 0
                       }} 
                       className="bg-slate-900 rounded-full animate-pulse-subtle"
                     />
@@ -216,6 +266,11 @@ export default function CanvasWorkspace({
                       style={{ 
                         width: `${el.width || 160}px`, 
                         height: `${el.height || 60}px`,
+                        minWidth: `${el.width || 160}px`, 
+                        minHeight: `${el.height || 60}px`,
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        flexShrink: 0,
                         border: `${el.thickness || 2}px solid #0f172a`
                       }} 
                       className="bg-transparent rounded-none"
@@ -226,7 +281,7 @@ export default function CanvasWorkspace({
             </div>
 
             {/* LAYER 2: Interactive Handles & Position Badges (Floats outside without clipping) */}
-            <div className="absolute inset-0 overflow-visible">
+            <div className="absolute inset-0 overflow-visible pointer-events-none">
               {elements.map(el => {
                 const isSelected = selectedId === el.id;
                 const isBeingDragged = draggingId === el.id;
@@ -244,15 +299,21 @@ export default function CanvasWorkspace({
                       position: 'absolute',
                       left: `${el.x}%`,
                       top: `${el.y}%`,
-                      width: el.type === 'qr' ? `${el.size || 60}px` : `${el.width || 60}px`,
-                      height: el.type === 'qr' ? `${el.size || 60}px` : `${el.height || 60}px`,
+                      width: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.width || 60}px` : el.type === 'barcode' ? `${el.width || 100}px` : el.type === 'line' ? `${el.width || 120}px` : el.type === 'rectangle' ? `${el.width || 160}px` : undefined,
+                      height: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.height || 60}px` : el.type === 'barcode' ? `${el.height || 30}px` : el.type === 'line' ? `${el.height || 4}px` : el.type === 'rectangle' ? `${el.height || 60}px` : undefined,
+                      minWidth: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.width || 60}px` : el.type === 'barcode' ? `${el.width || 100}px` : el.type === 'line' ? `${el.width || 120}px` : el.type === 'rectangle' ? `${el.width || 160}px` : 'max-content',
+                      minHeight: el.type === 'qr' ? `${el.size || 60}px` : el.type === 'image' ? `${el.height || 60}px` : el.type === 'barcode' ? `${el.height || 30}px` : el.type === 'line' ? `${el.height || 4}px` : el.type === 'rectangle' ? `${el.height || 60}px` : 'auto',
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      flexShrink: 0,
                       transform: 'translate(-50%, -50%)',
                       border: isSelected ? '2.5px solid #6366f1' : '1px dashed rgba(99, 102, 241, 0.4)',
                       borderRadius: '4px',
                       cursor: isBeingDragged ? 'grabbing' : 'grab',
                       zIndex: isSelected ? 40 : 10,
                       boxShadow: isSelected ? '0 0 12px rgba(99, 102, 241, 0.35)' : 'none',
-                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
+                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                      pointerEvents: 'auto'
                     }}
                     className="group"
                   >
