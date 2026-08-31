@@ -16,7 +16,7 @@ def get_padded_dimensions(width_dots: int, height_dots: int) -> tuple[int, int]:
 
 def dither_image(image: Image.Image, method: str = "threshold") -> Image.Image:
     """
-    Convert RGB/Grayscale image into 1-bit monochrome image (1 = black pixel, 0 = white paper).
+    Convert RGB/Grayscale image into 1-bit monochrome image (mode '1': 0 = black pixel, 255 = white paper).
     Supports 'threshold', 'floyd-steinberg', and 'bayer16' ordered dithering.
     """
     gray = image.convert("L")
@@ -41,9 +41,9 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
     it automatically rotates the image 90 degrees clockwise to align with the
     physical 14mm (112px) printhead.
     
-    Bit Mapping:
-    - 1 bit = thermal element fires (BLACK pixel)
-    - 0 bit = thermal element off (WHITE paper)
+    Bit Mapping on Nelko P21 TSPL BITMAP:
+    - 0 bit = thermal pin fires (BLACK pixel)
+    - 1 bit = thermal pin off (WHITE paper)
     
     Returns:
     - raw_bytes: Packed binary byte string
@@ -54,16 +54,10 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
         # Rotate 90 degrees clockwise so landscape design fits narrow 14mm printhead
         image = image.rotate(-90, expand=True)
 
-    mono = dither_image(image, method="threshold")
+    mono = image if image.mode == "1" else dither_image(image, method="threshold")
     w, h = mono.size
     padded_w, width_bytes = get_padded_dimensions(w, h)
     
-    # Create padded image if width is not byte-aligned
-    if w != padded_w:
-        padded_img = Image.new("1", (padded_w, h), 1)  # 1 = white in PIL
-        padded_img.paste(mono, (0, 0))
-        mono = padded_img
-        
     pixels = mono.load()
     raw_bytes = bytearray(width_bytes * h)
     
@@ -73,10 +67,15 @@ def pack_bitmap_to_tspl_bytes(image: Image.Image, auto_rotate_landscape: bool = 
             byte_val = 0
             for bit in range(8):
                 x = x_byte * 8 + bit
-                # In PIL "1" mode: 0 = Black pixel, 1 = White pixel
+                # In PIL mode '1': 0 = Black pixel, 255 (or > 0) = White pixel
                 # In TSPL BITMAP on Nelko P21: 0 bit = Black (thermal pin fires), 1 bit = White paper
-                if pixels[x, y] == 1:  # Set bit for White paper, leave 0 for Black
-                    byte_val |= (1 << (7 - bit))  # Set bit (MSB-first)
+                if x < w:
+                    if pixels[x, y] > 0:  # White pixel -> set bit to 1 (thermal head off)
+                        byte_val |= (1 << (7 - bit))
+                    # else: Black pixel -> leave bit as 0 (thermal head fires)
+                else:
+                    # Padded area beyond original image width is white paper
+                    byte_val |= (1 << (7 - bit))
             raw_bytes[idx] = byte_val
             idx += 1
             

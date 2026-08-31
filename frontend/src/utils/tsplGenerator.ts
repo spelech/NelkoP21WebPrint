@@ -108,6 +108,9 @@ export function convertCanvasToTsplBytes(
           if (setBit) {
             byteVal |= (1 << (7 - bit)); // MSB to LSB bit setting
           }
+        } else {
+          // Padded boundary bits are white paper (1 bit)
+          byteVal |= (1 << (7 - bit));
         }
       }
       rawBuffer[idx++] = byteVal;
