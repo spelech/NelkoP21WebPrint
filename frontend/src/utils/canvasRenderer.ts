@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { LabelElement } from '../types';
 import { QrCacheItem } from '../components/CanvasWorkspace';
 
@@ -63,6 +64,57 @@ export function drawCode128OnCanvas(
 }
 
 /**
+ * Preload all image assets and QR codes asynchronously before canvas rendering
+ */
+export async function prepareElementAssets(
+  elements: LabelElement[],
+  qrCache: Record<string, QrCacheItem> = {}
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
+  elements.forEach(el => {
+    if (el.type === 'image' && el.url) {
+      if (!el.imgObject || !el.imgObject.complete || el.imgObject.naturalWidth === 0) {
+        promises.push(
+          new Promise<void>(resolve => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              el.imgObject = img;
+              resolve();
+            };
+            img.onerror = () => {
+              resolve();
+            };
+            img.src = el.url;
+          })
+        );
+      }
+    } else if (el.type === 'qr' && el.content) {
+      const cached = qrCache[el.content];
+      if (!cached || !cached.img || !cached.img.complete || cached.img.naturalWidth === 0) {
+        promises.push(
+          QRCode.toDataURL(el.content, { margin: 1 })
+            .then((url: string) => new Promise<void>(resolve => {
+              const img = new Image();
+              img.onload = () => {
+                el.imgObject = img;
+                qrCache[el.content] = { url, img };
+                resolve();
+              };
+              img.onerror = () => resolve();
+              img.src = url;
+            }))
+            .catch(() => {})
+        );
+      }
+    }
+  });
+
+  await Promise.all(promises);
+}
+
+/**
  * Offscreen canvas builder helper for preview & print rasterization
  */
 export function buildOffscreenCanvas(
@@ -72,8 +124,8 @@ export function buildOffscreenCanvas(
   qrCache: Record<string, QrCacheItem> = {}
 ): HTMLCanvasElement {
   const dpi = 203;
-  const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
-  const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
+  const canvasWidthPx = Math.max(1, Math.round((activeWidthMm * dpi) / 25.4));
+  const canvasHeightPx = Math.max(1, Math.round((activeHeightMm * dpi) / 25.4));
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidthPx;
@@ -94,14 +146,19 @@ export function buildOffscreenCanvas(
     if (el.type === 'text') {
       const fontFamily = el.fontFamily === 'monospace' ? 'monospace, "Courier New"' : 'Inter, sans-serif';
       ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
+      ctx.textAlign = (el.align as CanvasTextAlign) || 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(el.content, posX, posY);
     } else if (el.type === 'qr') {
       const qrSize = (el.size || 60);
       const cached = qrCache[el.content];
-      if (cached && cached.img) {
-        ctx.drawImage(cached.img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+      const img = el.imgObject || cached?.img;
+      if (img && img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) {
+        try {
+          ctx.drawImage(img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        } catch {
+          ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
+        }
       } else {
         ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
         ctx.fillStyle = '#FFFFFF';
@@ -114,11 +171,16 @@ export function buildOffscreenCanvas(
       const bcH = (el.height || 30);
       drawCode128OnCanvas(ctx, el.content || '12345678', posX, posY, bcW, bcH);
     } else if (el.type === 'image' && el.url) {
-      const img = el.imgObject || new Image();
-      if (!el.imgObject) img.src = el.url;
+      const img = el.imgObject;
       const imgW = (el.width || 60);
       const imgH = (el.height || 60);
-      ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+      if (img && img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0) {
+        try {
+          ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+        } catch (err) {
+          console.warn('Could not draw image element:', err);
+        }
+      }
     } else if (el.type === 'line') {
       const lineW = (el.width || 120);
       const lineH = (el.height || 4);
@@ -146,70 +208,5 @@ export function buildOffscreenCanvasForJob(
   activeHeightMm: number,
   qrCache: Record<string, QrCacheItem> = {}
 ): HTMLCanvasElement {
-  const dpi = 203;
-  const canvasWidthPx = Math.round((activeWidthMm * dpi) / 25.4);
-  const canvasHeightPx = Math.round((activeHeightMm * dpi) / 25.4);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = canvasWidthPx;
-  canvas.height = canvasHeightPx;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-
-  // Fill White Background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, canvasWidthPx, canvasHeightPx);
-
-  // Draw Elements
-  ctx.fillStyle = '#000000';
-  jobElements.forEach(el => {
-    const posX = (el.x / 100) * canvasWidthPx;
-    const posY = (el.y / 100) * canvasHeightPx;
-
-    if (el.type === 'text') {
-      const fontFamily = el.fontFamily === 'monospace' ? 'monospace, "Courier New"' : 'Inter, sans-serif';
-      ctx.font = `${el.fontStyle === 'bold' ? 'bold' : ''} ${el.fontSize}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(el.content, posX, posY);
-    } else if (el.type === 'qr') {
-      const qrSize = (el.size || 60);
-      const cached = qrCache[el.content];
-      if (el.imgObject) {
-        ctx.drawImage(el.imgObject, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
-      } else if (cached && cached.img) {
-        ctx.drawImage(cached.img, posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
-      } else {
-        ctx.fillRect(posX - qrSize / 2, posY - qrSize / 2, qrSize, qrSize);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(posX - qrSize / 2 + 4, posY - qrSize / 2 + 4, qrSize - 8, qrSize - 8);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(posX - qrSize / 2 + 8, posY - qrSize / 2 + 8, qrSize - 16, qrSize - 16);
-      }
-    } else if (el.type === 'barcode') {
-      const bcW = (el.width || 100);
-      const bcH = (el.height || 30);
-      drawCode128OnCanvas(ctx, el.content || '12345678', posX, posY, bcW, bcH);
-    } else if (el.type === 'image' && el.url) {
-      const img = el.imgObject || new Image();
-      if (!el.imgObject) img.src = el.url;
-      const imgW = (el.width || 60);
-      const imgH = (el.height || 60);
-      ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
-    } else if (el.type === 'line') {
-      const lineW = (el.width || 120);
-      const lineH = (el.height || 4);
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(posX - lineW / 2, posY - lineH / 2, lineW, lineH);
-    } else if (el.type === 'rectangle') {
-      const rectW = (el.width || 160);
-      const rectH = (el.height || 60);
-      const thickness = (el.thickness || 2);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = thickness;
-      ctx.strokeRect(posX - rectW / 2, posY - rectH / 2, rectW, rectH);
-    }
-  });
-
-  return canvas;
+  return buildOffscreenCanvas(jobElements, activeWidthMm, activeHeightMm, qrCache);
 }

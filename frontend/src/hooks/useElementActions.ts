@@ -3,6 +3,7 @@ import {
   LabelPreset, LabelElement, TextElement, QRElement, BarcodeElement, LineElement, 
   RectangleElement, ImageElement, PrintStatus 
 } from '../types';
+import { svgToDataUrl } from '../utils/mdiIcons';
 
 export interface UseElementActionsParams {
   elements: LabelElement[];
@@ -155,16 +156,18 @@ export function useElementActions({
       }
     }
 
-    const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
+    const dataUrl = svgToDataUrl(svgMarkup);
     const newEl: ImageElement = { id: Date.now(), type: 'image', url: dataUrl, x: 50, y: 50, width: 60, height: 60, iconName: name };
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       newEl.imgObject = img;
-      pushHistory([...elements, newEl]);
-      setElements(prev => [...prev, newEl]);
-      setSelectedId(newEl.id);
     };
     img.src = dataUrl;
+    newEl.imgObject = img;
+    pushHistory([...elements, newEl]);
+    setElements(prev => [...prev, newEl]);
+    setSelectedId(newEl.id);
   };
 
   const handleExportLayout = (): void => {

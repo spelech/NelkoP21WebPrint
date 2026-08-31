@@ -228,6 +228,8 @@ def print_canvas_label_job(req: PrintCanvasRequest):
             raise HTTPException(status_code=500, detail="Failed to transmit print payload to printer")
             
         return {"status": "success", "bytes_sent": len(tspl_payload), "copies": req.copies}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Print error: {e}")
 

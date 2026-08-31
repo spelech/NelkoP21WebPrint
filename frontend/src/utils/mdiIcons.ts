@@ -35,6 +35,17 @@ export function getIconSvgMarkup(
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="60" height="60"><path fill="${color}" d="${d}"/></svg>`;
 }
 
+/**
+ * Converts SVG markup into a safe Base64 data URL compatible with all canvas and img elements
+ */
+export function svgToDataUrl(svgMarkup: string): string {
+  try {
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgMarkup)))}`;
+  } catch {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+  }
+}
+
 export const MDI_OFFLINE: MdiCategories = {
   "Essentials & UI": [
     { name: "star", set: "lucide", svg: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },

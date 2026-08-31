@@ -1,10 +1,10 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import QRCode from 'qrcode';
 import { browserBtDriver } from '../utils/webBluetoothDriver';
 import { convertCanvasToTsplBytes } from '../utils/tsplGenerator';
 import { 
   buildOffscreenCanvas as buildOffscreenCanvasUtil, 
-  buildOffscreenCanvasForJob as buildOffscreenCanvasForJobUtil 
+  buildOffscreenCanvasForJob as buildOffscreenCanvasForJobUtil,
+  prepareElementAssets
 } from '../utils/canvasRenderer';
 import { LabelPreset, LabelElement, PrintStatus, BatchJob } from '../types';
 import { QrCacheItem } from '../components/CanvasWorkspace';
@@ -171,7 +171,7 @@ export function usePrinterBridge({
       canvas, 
       activeWidthMm, 
       activeHeightMm, 
-      selectedPreset.gap, 
+      selectedPreset?.gap ?? 5, 
       density, 
       copies, 
       ditherMethod, 
@@ -196,25 +196,14 @@ export function usePrinterBridge({
           return { ...el, content } as LabelElement;
         });
 
-        for (let j = 0; j < jobElements.length; j++) {
-          const el = jobElements[j];
-          if (el.type === 'qr') {
-            const dataUrl = await QRCode.toDataURL(el.content, { margin: 1 });
-            const img = new Image();
-            await new Promise((resolve) => {
-              img.onload = resolve;
-              img.src = dataUrl;
-            });
-            el.imgObject = img;
-          }
-        }
+        await prepareElementAssets(jobElements, qrCache);
 
         const canvas = buildOffscreenCanvasForJobUtil(jobElements, activeWidthMm, activeHeightMm, qrCache);
         const payloadBytes = convertCanvasToTsplBytes(
           canvas, 
           activeWidthMm, 
           activeHeightMm, 
-          selectedPreset.gap, 
+          selectedPreset?.gap ?? 5, 
           density, 
           job.copies, 
           ditherMethod, 
@@ -272,6 +261,7 @@ export function usePrinterBridge({
     setShowPreview(true);
     setPreviewUrl(null);
     try {
+      await prepareElementAssets(elements, qrCache);
       const canvas = buildOffscreenCanvasUtil(elements, activeWidthMm, activeHeightMm, qrCache);
       const res = await fetch('/api/preview/canvas', {
         method: 'POST',
@@ -280,14 +270,14 @@ export function usePrinterBridge({
           image_base64: canvas.toDataURL('image/png'),
           width_mm: activeWidthMm,
           height_mm: activeHeightMm,
-          gap_mm: selectedPreset.gap,
+          gap_mm: selectedPreset?.gap ?? 5,
           dither_method: ditherMethod
         })
       });
       const blob = await res.blob();
       setPreviewUrl(URL.createObjectURL(blob));
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Preview error:', err);
     }
   };
 
@@ -296,23 +286,34 @@ export function usePrinterBridge({
     setIsPrinting(true);
     setPrintStatus(null);
 
-    if (useBrowserBt) {
-      try {
-        const payloadBytes = renderCanvasToTsplBytes();
+    try {
+      await prepareElementAssets(elements, qrCache);
+      const canvas = buildOffscreenCanvasUtil(elements, activeWidthMm, activeHeightMm, qrCache);
+
+      if (useBrowserBt) {
+        const payloadBytes = convertCanvasToTsplBytes(
+          canvas, 
+          activeWidthMm, 
+          activeHeightMm, 
+          selectedPreset?.gap ?? 5, 
+          density, 
+          copies, 
+          ditherMethod, 
+          invertColors
+        );
         const success = await browserBtDriver.sendBytes(payloadBytes);
         if (success) {
           setPrintStatus({ type: 'success', msg: `Direct Browser BT: Printed ${copies} copy successfully!` });
         } else {
           setPrintStatus({ type: 'error', msg: 'Browser Bluetooth stream failed or device disconnected' });
         }
-      } catch (err: any) {
-        setPrintStatus({ type: 'error', msg: `Direct Print Error: ${err?.message || err}` });
-      } finally {
-        setIsPrinting(false);
-      }
-    } else {
-      try {
-        const canvas = buildOffscreenCanvasUtil(elements, activeWidthMm, activeHeightMm, qrCache);
+      } else {
+        // Strip DOM node references before serializing to JSON payload
+        const cleanElements = elements.map(el => {
+          const { imgObject: _imgObject, ...rest } = el as any;
+          return rest;
+        });
+
         const res = await fetch('/api/print/canvas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -320,11 +321,11 @@ export function usePrinterBridge({
             image_base64: canvas.toDataURL('image/png'),
             width_mm: activeWidthMm,
             height_mm: activeHeightMm,
-            gap_mm: selectedPreset.gap,
+            gap_mm: selectedPreset?.gap ?? 5,
             density: density,
             copies: copies,
             dither_method: ditherMethod,
-            elements: elements
+            elements: cleanElements
           })
         });
         const data = await res.json();
@@ -333,11 +334,11 @@ export function usePrinterBridge({
         } else {
           setPrintStatus({ type: 'error', msg: data.detail || 'Print failed' });
         }
-      } catch (err: any) {
-        setPrintStatus({ type: 'error', msg: `Network Error: ${err?.message || err}` });
-      } finally {
-        setIsPrinting(false);
       }
+    } catch (err: any) {
+      setPrintStatus({ type: 'error', msg: `Print Error: ${err?.message || err}` });
+    } finally {
+      setIsPrinting(false);
     }
   };
 
