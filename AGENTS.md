@@ -29,6 +29,9 @@ Welcome, Agent. To maintain the codebase integrity and prevent regressions or ru
 ---
 
 ## 3. Docker & Deployment Pipeline
+- **Immutable Container & Official Images Rule**: 
+  - **NEVER** modify running containers in-place (no `docker cp`, live container file replacements, or hot-patching inside the running container).
+  - Only deploy using published/built Docker images from GHCR (`docker pull ghcr.io/spelech/nelkop21webprint:latest`) or built locally via Dockerfile (`docker build -t ghcr.io/spelech/nelkop21webprint:latest -f Dockerfile .`).
 - **Hardened Docker builds**: The `Dockerfile` compiles assets using `--legacy-peer-deps` to prevent peer version conflicts from failing the build process:
   ```dockerfile
   RUN npm install --legacy-peer-deps
